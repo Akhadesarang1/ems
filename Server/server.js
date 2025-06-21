@@ -1,11 +1,10 @@
-// server.js
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const path = require("path"); // For serving staic files
+const path = require("path"); // For serving static files
 const helmet = require("helmet"); // For security headers
 
 require("dotenv").config();
@@ -172,8 +171,6 @@ const isAdmin = (req, res, next) => {
 };
 
 // --- API Routes ---
-
-
 
 app.post("/api/auth/signup", async (req, res) => {
   try {
@@ -346,7 +343,6 @@ app.put("/api/tasks/:taskId", authenticateToken, async (req, res) => {
 });
 
 // --- Serve Static Files for Production ---
-// This part should come AFTER your API routes.
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "dist")));
 
