@@ -64,7 +64,7 @@ const EmployeeDashboard = () => {
     const fetchTasks = async () => {
       try {
         const userTasks = await apiRequest(
-          "http://localhost:5000/api/tasks",
+          "https://employee-server-oceo.onrender.com/api/tasks",
           "GET",
           token
         );
@@ -96,7 +96,7 @@ const EmployeeDashboard = () => {
 
     try {
       const updatedTask = await apiRequest(
-        `http://localhost:5000/api/tasks/${task._id}`,
+        `https://employee-server-oceo.onrender.com/${task._id}`,
         "PUT",
         token,
         body
@@ -115,7 +115,7 @@ const EmployeeDashboard = () => {
   const handleSetStatus = async (taskId, status) => {
     try {
       const updatedTask = await apiRequest(
-        `http://localhost:5000/api/tasks/${taskId}`,
+        `https://employee-server-oceo.onrender.com/${taskId}`,
         "PUT",
         token,
         { status, hasIssue: status === "Done" ? false : undefined }
@@ -129,7 +129,7 @@ const EmployeeDashboard = () => {
   const handleResolveIssue = async (taskId) => {
     try {
       const updatedTask = await apiRequest(
-        `http://localhost:5000/api/tasks/${taskId}`,
+        `https://employee-server-oceo.onrender.com/api/tasks/${taskId}`,
         "PUT",
         token,
         { hasIssue: false }
@@ -149,7 +149,7 @@ const EmployeeDashboard = () => {
     setModalState({ isOpen: false, mode: null, task: null });
 
   const handleLogout = () => {
-    apiRequest("http://localhost:5000/api/auth/logout", "POST", token).catch(
+    apiRequest("https://employee-server-oceo.onrender.com/api/auth/logout", "POST", token).catch(
       console.error
     );
     localStorage.removeItem("token");
