@@ -71,8 +71,7 @@ const AdminDashboard = () => {
         setLoading(true);
         // Fetch employees and tasks concurrently
         const [employeesData, tasksData] = await Promise.all([
-          apiRequest("http://localhost:5000/api/admin/employees", "GET", token),
-          apiRequest("http://localhost:5000/api/admin/tasks", "GET", token),
+          apiRequest("http://https://employee-server-oceo.onrender.com:5000/api/admin/employees", "GET", token),
         ]);
         setEmployees(employeesData);
         setTasks(tasksData);
@@ -100,7 +99,7 @@ const AdminDashboard = () => {
 
     try {
       const createdTaskData = await apiRequest(
-        "http://localhost:5000/api/admin/tasks",
+        "https://employee-server-oceo.onrender.com/api/admin/tasks",
         "POST",
         token,
         newTask
@@ -127,7 +126,7 @@ const AdminDashboard = () => {
 
   const handleLogout = async () => {
     try {
-      await apiRequest("http://localhost:5000/api/auth/logout", "POST", token);
+      await apiRequest("https://employee-server-oceo.onrender.com/api/auth/logout", "POST", token);
     } catch (err) {
       console.error("Logout failed:", err); // Log error but proceed with client-side logout
     } finally {
