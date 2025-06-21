@@ -27,7 +27,7 @@ const SignUp = () => {
     setError("");
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/api/auth/signup", {
+      const response = await fetch("https://employee-server-oceo.onrender.com/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, name, email, password }),
