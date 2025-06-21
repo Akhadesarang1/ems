@@ -12,11 +12,7 @@ import {
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
-// NOTE: We no longer need initialTasks or loggedInEmployee.
-// All data will come from the server and localStorage.
-
 // --- API Helper Function ---
-// A small utility to make authenticated API calls cleaner.
 const apiRequest = async (url, method, token, body = null) => {
   const options = {
     method,
@@ -55,6 +51,9 @@ const EmployeeDashboard = () => {
   const loggedInEmployee = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
 
+  // Define apiUrl once to be used across the component
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   useEffect(() => {
     if (!token || !loggedInEmployee) {
       navigate("/login");
@@ -64,7 +63,7 @@ const EmployeeDashboard = () => {
     const fetchTasks = async () => {
       try {
         const userTasks = await apiRequest(
-          "https://employee-server-oceo.onrender.com/api/tasks",
+          `${apiUrl}/api/tasks`,
           "GET",
           token
         );
@@ -79,7 +78,7 @@ const EmployeeDashboard = () => {
     fetchTasks();
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, [navigate, token]);
+  }, [navigate, token, loggedInEmployee, apiUrl]);
 
   const updateTaskState = (updatedTask) => {
     setTasks((currentTasks) =>
@@ -95,15 +94,16 @@ const EmployeeDashboard = () => {
       mode === "update" ? { description: modalText } : { hasIssue: true };
 
     try {
+      // CORRECTED ENDPOINT
       const updatedTask = await apiRequest(
-        `https://employee-server-oceo.onrender.com/${task._id}`,
+        `${apiUrl}/api/tasks/${task._id}`,
         "PUT",
         token,
         body
       );
       updateTaskState(updatedTask);
       if (mode === "raiseIssue")
-        console.log(`Issue raised for task ${task._id}:`, modalText); // Log issue text
+        console.log(`Issue raised for task ${task._id}:`, modalText);
     } catch (err) {
       console.error(`Failed to ${mode} task:`, err);
       setError(`Failed to ${mode} task. Please try again.`);
@@ -114,14 +114,15 @@ const EmployeeDashboard = () => {
 
   const handleSetStatus = async (taskId, status) => {
     try {
+      // CORRECTED ENDPOINT
       const updatedTask = await apiRequest(
-        `https://employee-server-oceo.onrender.com/${taskId}`,
+        `${apiUrl}/api/tasks/${taskId}`,
         "PUT",
         token,
         { status, hasIssue: status === "Done" ? false : undefined }
       );
       updateTaskState(updatedTask);
-    } catch (err) {
+    } catch (err)      {
       console.error("Failed to update status:", err);
     }
   };
@@ -129,7 +130,7 @@ const EmployeeDashboard = () => {
   const handleResolveIssue = async (taskId) => {
     try {
       const updatedTask = await apiRequest(
-        `https://employee-server-oceo.onrender.com/api/tasks/${taskId}`,
+        `${apiUrl}/api/tasks/${taskId}`,
         "PUT",
         token,
         { hasIssue: false }
@@ -149,7 +150,7 @@ const EmployeeDashboard = () => {
     setModalState({ isOpen: false, mode: null, task: null });
 
   const handleLogout = () => {
-    apiRequest("https://employee-server-oceo.onrender.com/api/auth/logout", "POST", token).catch(
+    apiRequest(`${apiUrl}/api/auth/logout`, "POST", token).catch(
       console.error
     );
     localStorage.removeItem("token");
@@ -162,7 +163,7 @@ const EmployeeDashboard = () => {
     filter === "Active" ? task.status !== "Done" : task.status === "Done"
   );
 
-  if (!loggedInEmployee) return null; // Render nothing if user data is not available yet
+  if (!loggedInEmployee) return null;
 
   return (
     <div
