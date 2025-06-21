@@ -173,8 +173,7 @@ const isAdmin = (req, res, next) => {
 
 // --- API Routes ---
 
-// Health Check Route
-app.get("/health", (req, res) => res.status(200).send("OK"));
+
 
 app.post("/api/auth/signup", async (req, res) => {
   try {
