@@ -2,10 +2,10 @@
   "name": "employee-management-system-server",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "Server/Server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node Server/Server.js",
+    "dev": "nodemon Server/Server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
