@@ -59,7 +59,7 @@ const Login = () => {
 
     try {
       const API_BASE_URL =
-        import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+        import.meta.env.VITE_API_BASE_URL || "https://employee-server-oceo.onrender.com";
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
