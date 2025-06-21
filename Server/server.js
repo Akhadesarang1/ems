@@ -4,8 +4,8 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const path = require("path"); // For serving static files
-const helmet = require("helmet"); // For security headers
+const path = require("path");
+const helmet = require("helmet");
 
 require("dotenv").config();
 
@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173", // Allow requests from your frontend
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
   })
 );
 app.use(bodyParser.json());
@@ -48,7 +48,6 @@ const generateAvatar = (username) => {
             </text>
         </svg>
     `;
-  // Return as a Base64 Data URI
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 };
 
@@ -128,7 +127,7 @@ const seedAdminUsers = async () => {
           email: admin.email,
           password: admin.password,
           role: "admin",
-          avatar: generateAvatar(admin.username), // Use generated SVG avatar
+          avatar: generateAvatar(admin.username),
         });
         await newAdmin.save();
         console.log(`Admin user ${admin.email} created.`);
@@ -156,6 +155,7 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
   if (token == null) return res.sendStatus(401);
+
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.sendStatus(403);
     req.user = user;
@@ -196,7 +196,7 @@ app.post("/api/auth/signup", async (req, res) => {
       email,
       password,
       role,
-      avatar: generateAvatar(username), // Use generated SVG avatar
+      avatar: generateAvatar(username),
     });
     await newUser.save();
     res.status(201).json({ message: "Account created successfully!" });
@@ -347,7 +347,7 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "dist")));
 
   // The "catchall" handler: for any request that doesn't
-  // match one above, send back React's index.html file.
+  // match one above, send back the index.html file.
   app.get("/*", (req, res) => {
     res.sendFile(path.join(__dirname, "dist", "index.html"));
   });
