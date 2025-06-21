@@ -71,7 +71,7 @@ const AdminDashboard = () => {
         setLoading(true);
         // Fetch employees and tasks concurrently
         const [employeesData, tasksData] = await Promise.all([
-          apiRequest("http://https://employee-server-oceo.onrender.com:5000/api/admin/employees", "GET", token),
+          apiRequest("http://https://employee-server-oceo.onrender.com/api/admin/employees", "GET", token),
         ]);
         setEmployees(employeesData);
         setTasks(tasksData);
