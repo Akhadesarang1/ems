@@ -1,4 +1,3 @@
-// Corrected server.js
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -209,7 +208,7 @@ app.post("/api/auth/signup", async (req, res) => {
 });
 
 app.post("/api/auth/login", async (req, res) => {
-  try {
+  try {.
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid credentials." });
@@ -345,10 +344,12 @@ app.put("/api/tasks/:taskId", authenticateToken, async (req, res) => {
 
 // --- Serve Static Files for Production ---
 if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "dist")));
+  // Correct path: Go up one level from /Server, then into /Client/dist
+  app.use(express.static(path.join(__dirname, "..", "Client", "dist")));
 
+  // The "catchall" handler
   app.get("/*", (req, res) => {
-    res.sendFile(path.join(__dirname, "dist", "index.html"));
+    res.sendFile(path.join(__dirname, "..", "Client", "dist", "index.html"));
   });
 }
 
