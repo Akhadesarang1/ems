@@ -12,11 +12,7 @@ import {
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
-// NOTE: All initial/mock data has been removed.
-// All data will now be fetched from the server.
-
 // --- API Helper Function ---
-// A small utility to make authenticated API calls cleaner.
 const apiRequest = async (url, method, token, body = null) => {
   const options = {
     method,
@@ -55,29 +51,30 @@ const AdminDashboard = () => {
 
   const navigate = useNavigate();
 
-  // Get user data and token from localStorage
   const loggedInAdmin = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
 
   useEffect(() => {
-    // **PROTECTED ROUTE LOGIC**
     if (!token || !loggedInAdmin || loggedInAdmin.role !== "admin") {
-      navigate("/login"); // Redirect if not logged in or not an admin
+      navigate("/login");
       return;
     }
 
     const fetchAdminData = async () => {
       try {
         setLoading(true);
-        // Fetch employees and tasks concurrently
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+        // Fetch employees and tasks concurrently with the correct URLs
         const [employeesData, tasksData] = await Promise.all([
-          apiRequest("http://https://employee-server-oceo.onrender.com/api/admin/employees", "GET", token),
+          apiRequest(`${apiUrl}/api/admin/employees`, "GET", token),
+          apiRequest(`${apiUrl}/api/admin/tasks`, "GET", token),
         ]);
+
         setEmployees(employeesData);
         setTasks(tasksData);
       } catch (err) {
         setError(err.message);
-        // If token is invalid, server will likely send 401/403, redirect to login
         if (err.message.includes("401") || err.message.includes("403")) {
           navigate("/login");
         }
@@ -87,7 +84,7 @@ const AdminDashboard = () => {
     };
 
     fetchAdminData();
-  }, [navigate, token]); // Rerun if navigate or token changes
+  }, [navigate, token]);
 
   const handleInputChange = (e) =>
     setNewTask((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -98,13 +95,13 @@ const AdminDashboard = () => {
       return alert("Please provide a title and assign the task.");
 
     try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
       const createdTaskData = await apiRequest(
-        "https://employee-server-oceo.onrender.com/api/admin/tasks",
+        `${apiUrl}/api/admin/tasks`,
         "POST",
         token,
         newTask
       );
-      // To display the new task instantly, we need to add the populated 'assignedTo' info
       const newTaskWithEmployee = {
         ...createdTaskData,
         assignedTo: employees.find(
@@ -126,9 +123,10 @@ const AdminDashboard = () => {
 
   const handleLogout = async () => {
     try {
-      await apiRequest("https://employee-server-oceo.onrender.com/api/auth/logout", "POST", token);
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      await apiRequest(`${apiUrl}/api/auth/logout`, "POST", token);
     } catch (err) {
-      console.error("Logout failed:", err); // Log error but proceed with client-side logout
+      console.error("Logout failed:", err);
     } finally {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -142,7 +140,6 @@ const AdminDashboard = () => {
     return tasks;
   };
 
-  // Prevent rendering anything if the user is not authenticated yet
   if (!loggedInAdmin) return null;
 
   return (
