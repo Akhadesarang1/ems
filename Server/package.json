@@ -1,15 +1,4 @@
 {
-  "name": "employee-management-system",
-  "version": "1.0.0",
-  "description": "MERN‑style Employee Management System",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
