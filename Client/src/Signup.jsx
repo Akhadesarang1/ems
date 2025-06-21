@@ -26,15 +26,21 @@ const SignUp = () => {
     if (isLoading || isSuccess) return;
     setError("");
     setIsLoading(true);
+
+    // Get the API URL from environment variables, with a fallback for local development
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
     try {
-      const response = await fetch("https://employee-server-oceo.onrender.com/api/auth/signup", {
+      // Use the apiUrl variable in the fetch request
+      const response = await fetch(`${apiUrl}/api/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, name, email, password }),
       });
       const data = await response.json();
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(data.message || "Something went wrong.");
+      }
       setIsSuccess(true);
       setTimeout(() => navigate("/login"), 2000);
     } catch (err) {
