@@ -101,10 +101,10 @@ const Login = () => {
               <FiLock className="text-indigo-400 text-5xl" />
             </div>
             <h1 className="text-4xl font-extrabold tracking-tight text-white">
-              Project Sentinel
+              Project Guard
             </h1>
             <p className="text-white/60 mt-2 mb-8">
-              Your secure gateway to seamless task management.
+              Secure and seamless task management .
             </p>
             <motion.button
               whileHover={{ scale: 1.02 }}
