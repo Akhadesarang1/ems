@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, memo } from "react";
 import {
   FiActivity,
   FiAlertOctagon,
+  FiBell,
   FiCheck,
   FiCheckSquare,
   FiClipboard,
@@ -17,7 +18,7 @@ import {
   FiUser,
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "./api";
+import { apiRequest, API_BASE_URL } from "./api";
 
 // NOTE: We no longer need initialTasks or loggedInEmployee.
 // All data will come from the server and localStorage.
@@ -27,8 +28,8 @@ import { apiRequest } from "./api";
 const Tooltip = ({ text, children }) => {
   const [isVisible, setIsVisible] = useState(false);
   return (
-    <div className="relative inline-block" 
-         onMouseEnter={() => setIsVisible(true)} 
+    <div className="relative inline-block"
+         onMouseEnter={() => setIsVisible(true)}
          onMouseLeave={() => setIsVisible(false)}>
       {children}
       <AnimatePresence mode="wait">
@@ -93,6 +94,8 @@ const EmployeeDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [previewFile, setPreviewFile] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -117,14 +120,14 @@ const EmployeeDashboard = () => {
       return;
     }
 
-    const fetchTasks = async () => {
+    const fetchTasksAndNotifications = async () => {
       try {
-        const userTasks = await apiRequest(
-          "/api/tasks",
-          "GET",
-          token
-        );
+        const [userTasks, userNotifications] = await Promise.all([
+          apiRequest("/api/tasks", "GET", token),
+          apiRequest("/api/notifications", "GET", token),
+        ]);
         setTasks(userTasks);
+        setNotifications(userNotifications);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -132,10 +135,21 @@ const EmployeeDashboard = () => {
       }
     };
 
-    fetchTasks();
+    fetchTasksAndNotifications();
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, [navigate, token]);
+
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      await apiRequest(`/api/notifications/${notificationId}/read`, "PUT", token);
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === notificationId ? { ...n, isRead: true } : n))
+      );
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
+  };
 
   const handlePreview = (filePath) => {
     setPreviewFile(filePath);
@@ -167,6 +181,7 @@ const EmployeeDashboard = () => {
     }
 
     try {
+      // CORRECTED ENDPOINT
       const updatedTask = await apiRequest(
         `/api/tasks/${task._id}`,
         "PUT",
@@ -187,6 +202,7 @@ const EmployeeDashboard = () => {
   const handleSetStatus = async (taskId, status) => {
     setActionLoading(true);
     try {
+      // CORRECTED ENDPOINT
       const updatedTask = await apiRequest(
         `/api/tasks/${taskId}`,
         "PUT",
@@ -241,9 +257,9 @@ const EmployeeDashboard = () => {
     navigate("/login");
   };
 
-  const cardActions = { 
-    onDone: (taskId) => handleSetStatus(taskId, "Done"), 
-    onUpdate: (task) => openModal(task, "update"), 
+  const cardActions = {
+    onDone: (taskId) => handleSetStatus(taskId, "Done"),
+    onUpdate: (task) => openModal(task, "update"),
     onIssue: (taskId) => {
       const task = tasks.find(t => t._id === taskId);
       openModal(task, "raiseIssue");
@@ -253,7 +269,7 @@ const EmployeeDashboard = () => {
   const filteredTasks = tasks.filter((task) => {
     const isTabMatch = filter === "Active" ? task.status !== "Done" : task.status === "Done";
     if (!isTabMatch) return false;
-    
+
     if (debouncedSearchTerm) {
       const query = debouncedSearchTerm.toLowerCase();
       return (
@@ -291,36 +307,60 @@ const EmployeeDashboard = () => {
               <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-indigo-400 transition-colors" />
             </div>
           </div>
-          <div className="relative flex items-center gap-4">
-            <span className="hidden sm:block text-right">
-              <p className="text-xs font-black text-white leading-none uppercase tracking-tighter">{loggedInEmployee.name}</p>
-              <p className="text-[8px] text-indigo-400 font-bold uppercase tracking-widest mt-1">{loggedInEmployee.role}</p>
-            </span>
-            <Tooltip text="User Settings">
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsProfileOpen((prev) => !prev)}
-                className="p-1 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 hover:bg-white/10 transition-all flex items-center shadow-lg"
-              >
-                <img
-                  src={loggedInEmployee.avatar}
-                  alt="Profile"
-                  loading="lazy"
-                  className="w-10 h-10 rounded-xl border-2 border-indigo-500/20 shadow-indigo-500/10 shadow-lg"
-                />
-              </motion.button>
-            </Tooltip>
+            <div className="relative flex items-center gap-4">
+              <div className="relative">
+                <Tooltip text="Notifications">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setIsNotificationsOpen((prev) => !prev)}
+                    className="p-3 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 hover:bg-white/10 transition-all flex items-center shadow-lg relative"
+                  >
+                    <FiBell className={clsx("text-xl transition-colors", notifications.some(n => !n.isRead) ? "text-indigo-400" : "text-white/40")} />
+                    {notifications.some(n => !n.isRead) && (
+                      <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[#08090a]" />
+                    )}
+                  </motion.button>
+                </Tooltip>
+                <AnimatePresence>
+                  {isNotificationsOpen && (
+                    <NotificationDropdown
+                      notifications={notifications}
+                      onMarkAsRead={handleMarkAsRead}
+                      close={() => setIsNotificationsOpen(false)}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
 
-            <AnimatePresence>
-              {isProfileOpen && (
-                <ProfileDropdown
-                  employee={loggedInEmployee}
-                  onLogout={handleLogout}
-                  close={() => setIsProfileOpen(false)}
-                />
-              )}
-            </AnimatePresence>
-          </div>
+              <span className="hidden sm:block text-right">
+                <p className="text-xs font-black text-white leading-none uppercase tracking-tighter">{loggedInEmployee.name}</p>
+                <p className="text-[8px] text-indigo-400 font-bold uppercase tracking-widest mt-1">{loggedInEmployee.role}</p>
+              </span>
+              <Tooltip text="User Settings">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setIsProfileOpen((prev) => !prev)}
+                  className="p-1 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 hover:bg-white/10 transition-all flex items-center shadow-lg"
+                >
+                  <img
+                    src={loggedInEmployee.avatar}
+                    alt="Profile"
+                    loading="lazy"
+                    className="w-10 h-10 rounded-xl border-2 border-indigo-500/20 shadow-indigo-500/10 shadow-lg"
+                  />
+                </motion.button>
+              </Tooltip>
+
+              <AnimatePresence>
+                {isProfileOpen && (
+                  <ProfileDropdown
+                    employee={loggedInEmployee}
+                    onLogout={handleLogout}
+                    close={() => setIsProfileOpen(false)}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
         </div>
       </header>
 
@@ -410,10 +450,10 @@ const EmployeeDashboard = () => {
           ) : filteredTasks.length > 0 ? (
             <motion.div layout className="space-y-8">
               {filteredTasks.map((task) => (
-                <TaskCard 
-                  key={task._id} 
-                  task={task} 
-                  actions={cardActions} 
+                <TaskCard
+                  key={task._id}
+                  task={task}
+                  actions={cardActions}
                   Tooltip={Tooltip}
                 />
               ))}
@@ -452,7 +492,7 @@ const EmployeeDashboard = () => {
 
       <AnimatePresence>
         {toast && (
-          <Toast message={toast.message} type={toast.type} 
+          <Toast message={toast.message} type={toast.type}
                  onClose={() => setToast(null)} />
         )}
       </AnimatePresence>
@@ -461,6 +501,67 @@ const EmployeeDashboard = () => {
 };
 
 // --- Child Components ---
+
+const NotificationDropdown = ({ notifications, onMarkAsRead, close }) => {
+  const dropdownRef = useRef(null);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target))
+        close();
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [close]);
+
+  return (
+    <motion.div
+      ref={dropdownRef}
+      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+      className="absolute top-full right-0 mt-4 w-80 bg-slate-900/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 overflow-hidden"
+    >
+      <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">Notifications</h3>
+        <span className="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full font-bold">
+          {notifications.filter(n => !n.isRead).length} New
+        </span>
+      </div>
+      <div className="max-h-96 overflow-y-auto custom-scrollbar">
+        {notifications.length > 0 ? (
+          notifications.map((notification) => (
+            <div
+              key={notification._id}
+              onClick={() => onMarkAsRead(notification._id)}
+              className={clsx(
+                "p-5 border-b border-white/5 transition-all cursor-pointer relative group",
+                notification.isRead ? "opacity-50" : "bg-indigo-600/5 hover:bg-indigo-600/10"
+              )}
+            >
+              {!notification.isRead && (
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
+              )}
+              <h4 className="text-xs font-bold text-white mb-1 uppercase tracking-tight">
+                {notification.title}
+              </h4>
+              <p className="text-[11px] text-white/40 leading-relaxed font-medium">
+                {notification.message}
+              </p>
+              <p className="text-[9px] text-indigo-400/60 mt-3 font-bold uppercase tracking-widest">
+                {new Date(notification.createdAt).toLocaleDateString()} at {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          ))
+        ) : (
+          <div className="p-10 text-center">
+            <FiBell className="text-3xl text-white/10 mx-auto mb-4" />
+            <p className="text-[11px] font-black uppercase tracking-widest text-white/20">All caught up</p>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
 
 const ProfileDropdown = ({ employee, onLogout, close }) => {
   const dropdownRef = useRef(null);
@@ -503,21 +604,21 @@ const FileDisplay = ({ filePath, label, isResult = false, onPreview }) => {
   if (!filePath) return null;
   const isImage = /\.(jpeg|jpg|png|webp)$/i.test(filePath);
   const isPDF = /\.pdf$/i.test(filePath);
-  
-  const containerClass = isResult 
+
+  const containerClass = isResult
     ? "mt-4 rounded-xl overflow-hidden border border-emerald-500/30 shadow-lg group relative cursor-pointer"
     : "mt-6 rounded-xl overflow-hidden border border-slate-700 shadow-inner group relative cursor-pointer";
   const labelText = isResult ? "My Submission" : "Instruction File";
 
   return (
-    <div 
+    <div
       className={containerClass}
       onClick={() => onPreview(filePath)}
     >
       {isImage ? (
-        <img 
-          src={`http://localhost:5000${filePath}`} 
-          alt={label} 
+        <img
+          src={`http://localhost:5000${filePath}`}
+          alt={label}
           loading="lazy"
           crossOrigin="anonymous"
           className="w-full h-auto max-h-64 object-cover transition-transform duration-500 group-hover:scale-105"
@@ -543,7 +644,7 @@ const FileDisplay = ({ filePath, label, isResult = false, onPreview }) => {
           "text-indigo-400": !isResult
         })}>{labelText}</span>
       </div>
-      
+
       {/* Interaction Overlay */}
       <div className="absolute inset-0 bg-indigo-600/0 group-hover:bg-indigo-600/5 transition-colors flex items-center justify-center">
          <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-75 group-hover:scale-100 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20">
@@ -577,7 +678,7 @@ const PreviewModal = ({ filePath, onClose }) => {
           <span className="text-xs font-black uppercase tracking-[0.2em] text-white/40 px-4">
              File Preview
           </span>
-          <button 
+          <button
             onClick={onClose}
             className="p-3 rounded-xl bg-white/5 hover:bg-red-500/20 text-white hover:text-red-400 transition-all border border-white/10"
           >
@@ -587,22 +688,22 @@ const PreviewModal = ({ filePath, onClose }) => {
 
         <div className="flex-1 w-full bg-slate-950 overflow-auto flex items-center justify-center p-4 text-center">
           {isImage ? (
-            <img 
-              src={`http://localhost:5000${filePath}`} 
-              alt="Preview" 
+            <img
+              src={`${API_BASE_URL}${filePath}`}
+              alt="Preview"
               crossOrigin="anonymous"
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
             />
           ) : isPDF ? (
-            <object 
-              data={`http://localhost:5000${filePath}`} 
+            <object
+              data={`${API_BASE_URL}${filePath}`}
               type="application/pdf"
               className="w-full h-full rounded-xl"
             >
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <FiActivity className="text-4xl text-indigo-400" />
                 <p className="text-white/60">PDF preview not supported by your browser.</p>
-                <a href={`http://localhost:5000${filePath}`} target="_blank" className="px-6 py-2 bg-indigo-600 text-white rounded-xl">Open PDF</a>
+                <a href={`${API_BASE_URL}${filePath}`} target="_blank" className="px-6 py-2 bg-indigo-600 text-white rounded-xl">Open PDF</a>
               </div>
             </object>
           ) : (
@@ -614,8 +715,8 @@ const PreviewModal = ({ filePath, onClose }) => {
                   <h3 className="text-2xl font-black text-white mb-2">Native Preview Unavailable</h3>
                   <p className="text-white/40 text-sm font-medium">This file format cannot be viewed directly in the browser.</p>
                </div>
-               <a 
-                 href={`http://localhost:5000${filePath}`} 
+               <a
+                 href={`${API_BASE_URL}${filePath}`}
                  target="_blank"
                  download
                  className="flex items-center justify-center gap-3 w-full py-4 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20"
@@ -647,11 +748,11 @@ const TaskCard = memo(({ task, actions, Tooltip }) => {
         <div className="absolute left-0 top-0 bottom-0 w-2 bg-red-500 shadow-[6px_0_20px_rgba(239,68,68,0.3)] z-20" />
       )}
       <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600/5 blur-[80px] -z-10 group-hover:bg-indigo-600/10 transition-colors" />
-      
+
       <div className="flex flex-col lg:flex-row justify-between items-start gap-8 relative z-10">
         <div className="flex-1 space-y-6">
           <div className="flex flex-wrap items-center gap-3">
-            <span className={clsx("px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all", 
+            <span className={clsx("px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all",
               priorityConfig[task.priority].color, priorityConfig[task.priority].bg, priorityConfig[task.priority].border)}>
               {task.priority} Priority
             </span>
@@ -669,7 +770,7 @@ const TaskCard = memo(({ task, actions, Tooltip }) => {
               </span>
             )}
           </div>
-          
+
           <div className="space-y-2">
             <h3 className="text-3xl sm:text-4xl font-black text-white tracking-tighter leading-none group-hover:text-indigo-400 transition-colors">
               {task.title}
@@ -790,7 +891,7 @@ const Modal = ({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/5 blur-[100px] -z-10" />
-          
+
           <div className="flex items-center gap-4 mb-8">
             <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
               {modalConfig[mode].icon}
@@ -802,7 +903,7 @@ const Modal = ({
           </div>
 
           <p className="text-white/50 text-sm mb-6 font-medium leading-relaxed">{modalConfig[mode].desc}</p>
-          
+
           <textarea
             value={modalText}
             onChange={(e) => setModalText(e.target.value)}

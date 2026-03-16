@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -13,6 +12,7 @@ const helmet = require("helmet"); // For security headers
 require("dotenv").config();
 
 const app = express();
+const https = require("https"); // For keep-alive self-ping
 const PORT = process.env.PORT || 5000;
 
 // --- Security and CORS Middleware ---
@@ -68,9 +68,9 @@ const upload = multer({
     console.log(`[MULTER DEBUG] Processing file: ${file.originalname} (${file.mimetype})`);
     const filetypes = /jpeg|jpg|png|webp|pdf|doc|docx|xls|xlsx/;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    
+
     // Support common variant mimetypes
-    const mimetype = filetypes.test(file.mimetype) || 
+    const mimetype = filetypes.test(file.mimetype) ||
                      file.mimetype.includes("image/") ||
                      file.mimetype.includes("application/pdf") ||
                      file.mimetype.includes("application/msword") ||
@@ -79,7 +79,7 @@ const upload = multer({
     if (mimetype && extname) {
       return cb(null, true);
     }
-    
+
     console.error(`[MULTER REJECTED] ${file.originalname}: mimetype=${file.mimetype}, ext=${path.extname(file.originalname)}`);
     cb(new Error("Allowed formats: images, pdf, doc, docx, xls, xlsx"));
   },
@@ -118,7 +118,6 @@ const generateAvatar = (username) => {
             </text>
         </svg>
     `;
-  // Return as a Base64 Data URI
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 };
 
@@ -172,6 +171,18 @@ const TaskSchema = new mongoose.Schema(
 );
 const Task = mongoose.model("Task", TaskSchema);
 
+const NotificationSchema = new mongoose.Schema(
+  {
+    recipient: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    title: { type: String, required: true },
+    message: { type: String, required: true },
+    taskId: { type: mongoose.Schema.Types.ObjectId, ref: "Task" },
+    isRead: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+const Notification = mongoose.model("Notification", NotificationSchema);
+
 // --- Admin User Seeding Function ---
 const seedAdminUsers = async () => {
   try {
@@ -200,7 +211,7 @@ const seedAdminUsers = async () => {
           email: admin.email,
           password: admin.password,
           role: "admin",
-          avatar: generateAvatar(admin.username), // Use generated SVG avatar
+          avatar: generateAvatar(admin.username),
         });
         await newAdmin.save();
         console.log(`Admin user ${admin.email} created.`);
@@ -228,7 +239,7 @@ const authenticateToken = (req, res, next) => {
   console.log(`[AUTH DEBUG] authenticateToken called for ${req.method} ${req.url}`);
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
-  
+
   if (token == null) {
     console.warn("[AUTH DEBUG] No token provided in authorization header");
     return res.status(401).json({ message: "No authentication token provided" });
@@ -251,10 +262,47 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-// --- API Routes ---
 
-// Health Check Route
-app.get("/health", (req, res) => res.status(200).send("OK"));
+// --- Render Keep-Alive ---
+// This keeps the Render free tier from sleeping by pinging it every 14 minutes.
+app.get("/api/ping", (req, res) => res.status(200).send("pong"));
+
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+if (RENDER_EXTERNAL_URL) {
+  setInterval(() => {
+    https.get(`${RENDER_EXTERNAL_URL}/api/ping`, (res) => {
+      console.log(`[KEEP-ALIVE] Ping sent: ${res.statusCode}`);
+    }).on("error", (err) => {
+      console.error("[KEEP-ALIVE] Error:", err.message);
+    });
+  }, 14 * 60 * 1000); // 14 minutes
+}
+
+// --- Notification Routes ---
+app.get("/api/notifications", authenticateToken, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ recipient: req.user.id })
+      .sort({ createdAt: -1 })
+      .limit(20);
+    res.json(notifications);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching notifications", error: error.message });
+  }
+});
+
+app.put("/api/notifications/:id/read", authenticateToken, async (req, res) => {
+  try {
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, recipient: req.user.id },
+      { isRead: true },
+      { new: true }
+    );
+    if (!notification) return res.status(404).json({ message: "Notification not found" });
+    res.json(notification);
+  } catch (error) {
+    res.status(500).json({ message: "Error updating notification", error: error.message });
+  }
+});
 
 app.post("/api/auth/signup", async (req, res) => {
   try {
@@ -280,7 +328,7 @@ app.post("/api/auth/signup", async (req, res) => {
       email,
       password,
       role,
-      avatar: generateAvatar(username), // Use generated SVG avatar
+      avatar: generateAvatar(username),
     });
     await newUser.save();
     res.status(201).json({ message: "Account created successfully!" });
@@ -309,7 +357,7 @@ app.post("/api/auth/login", async (req, res) => {
       avatar: user.avatar,
     };
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
-      expiresIn: "8h",
+      expiresIn: "30d",
     });
     res.json({ token, user: tokenPayload });
   } catch (error) {
@@ -377,6 +425,7 @@ app.delete(
   }
 );
 
+
 app.get("/api/admin/tasks", authenticateToken, isAdmin, async (req, res) => {
   try {
     const tasks = await Task.find()
@@ -417,6 +466,15 @@ app.post(
       }
 
       const newTask = await Task.create(taskData);
+
+      // Create a notification for the employee
+      await Notification.create({
+        recipient: assignedTo,
+        title: "New Task Assigned",
+        message: `You have been assigned a new task: ${title}`,
+        taskId: newTask._id,
+      });
+
       res.status(201).json(newTask);
     } catch (error) {
       console.error("DEBUG: Error creating task:", error);
@@ -470,6 +528,17 @@ app.put(
       }
 
       const updatedTask = await task.save();
+
+      // If updated by admin, notify the employee
+      if (req.user.role === "admin") {
+        await Notification.create({
+          recipient: updatedTask.assignedTo,
+          title: "Task Updated/Re-assigned",
+          message: `Your task "${updatedTask.title}" has been updated or re-assigned.`,
+          taskId: updatedTask._id,
+        });
+      }
+
       res.json(updatedTask);
     } catch (error) {
       console.error("DEBUG: Error updating task:", error);
@@ -480,22 +549,23 @@ app.put(
   }
 );
 
+
 // --- Serve Static Files for Production ---
-// This part should come AFTER your API routes.
 if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "dist")));
+  // Correct path: Go up one level from /Server, then into /Client/dist
+  app.use(express.static(path.join(__dirname, "..", "Client", "dist")));
 
   // The "catchall" handler: for any request that doesn't
   // match one above, send back React's index.html file.
   app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "dist", "index.html"));
+    res.sendFile(path.join(__dirname, "..", "Client", "dist", "index.html"));
   });
 }
 
 // --- Global Error Handler ---
 app.use((err, req, res, next) => {
   console.error("FATAL ERROR:", err);
-  
+
   // Handle Mongoose CastErrors (invalid IDs) specifically
   if (err.name === 'CastError') {
     return res.status(400).json({

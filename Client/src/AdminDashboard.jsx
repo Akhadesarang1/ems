@@ -15,7 +15,7 @@ import {
   FiUser
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "./api";
+import { apiRequest, API_BASE_URL } from "./api";
 
 // NOTE: All initial/mock data has been removed.
 // All data will now be fetched from the server.
@@ -91,6 +91,7 @@ const AdminDashboard = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [editingTask, setEditingTask] = useState(null);
 
   const navigate = useNavigate();
 
@@ -107,25 +108,26 @@ const AdminDashboard = () => {
   const token = localStorage.getItem("token");
 
   useEffect(() => {
-    // **PROTECTED ROUTE LOGIC**
     if (!token || !loggedInAdmin || loggedInAdmin.role !== "admin") {
-      navigate("/login"); // Redirect if not logged in or not an admin
+      navigate("/login");
       return;
     }
 
     const fetchAdminData = async () => {
       try {
         setLoading(true);
-        // Fetch employees and tasks concurrently
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+        // Fetch employees and tasks concurrently with the correct URLs
         const [employeesData, tasksData] = await Promise.all([
           apiRequest("/api/admin/employees", "GET", token),
           apiRequest("/api/admin/tasks", "GET", token),
         ]);
+
         setEmployees(employeesData);
         setTasks(tasksData);
       } catch (err) {
         setError(err.message);
-        // If token is invalid, server will likely send 401/403, redirect to login
         if (err.message.includes("401") || err.message.includes("403")) {
           navigate("/login");
         }
@@ -143,8 +145,14 @@ const AdminDashboard = () => {
 
   const closePreview = () => setPreviewFile(null);
 
-  const handleInputChange = (e) =>
-    setNewTask((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    if (editingTask) {
+      setEditingTask((prev) => ({ ...prev, [name]: value }));
+    } else {
+      setNewTask((prev) => ({ ...prev, [name]: value }));
+    }
+  };
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -153,36 +161,47 @@ const AdminDashboard = () => {
 
   const handleAssignTask = async (e) => {
     e.preventDefault();
-    if (!newTask.title || !newTask.assignedTo) {
+    const taskData = editingTask || newTask;
+    if (!taskData.title || !taskData.assignedTo) {
       showToast("Please provide a title and assign the task.", "error");
       return;
     }
     setActionLoading(true);
     try {
       const formData = new FormData();
-      formData.append("title", newTask.title);
-      formData.append("description", newTask.description);
-      formData.append("priority", newTask.priority);
-      formData.append("dueDate", newTask.dueDate);
-      formData.append("assignedTo", newTask.assignedTo);
-      if (newTask.taskImage) {
-        formData.append("taskImage", newTask.taskImage);
+      formData.append("title", taskData.title);
+      formData.append("description", taskData.description);
+      formData.append("priority", taskData.priority);
+      formData.append("dueDate", taskData.dueDate);
+      
+      // If editing, we might want to reset status to In Progress
+      if (editingTask) {
+        formData.append("status", "In Progress");
+      }
+      
+      const assignedToId = typeof taskData.assignedTo === 'object' ? taskData.assignedTo._id : taskData.assignedTo;
+      formData.append("assignedTo", assignedToId);
+
+      if (taskData.taskImage instanceof File) {
+        formData.append("taskImage", taskData.taskImage);
       }
 
-      const createdTaskData = await apiRequest(
-        "/api/admin/tasks",
-        "POST",
-        token,
-        formData
-      );
-      // To display the new task instantly, we need to add the populated 'assignedTo' info
-      const newTaskWithEmployee = {
-        ...createdTaskData,
-        assignedTo: employees.find(
-          (emp) => emp._id === createdTaskData.assignedTo
-        ),
-      };
-      setTasks((prevTasks) => [newTaskWithEmployee, ...prevTasks]);
+      let result;
+      if (editingTask) {
+        result = await apiRequest(`/api/tasks/${editingTask._id}`, "PUT", token, formData);
+        showToast("Task updated and re-assigned!");
+        setTasks(prev => prev.map(t => t._id === result._id ? { ...result, assignedTo: employees.find(e => e._id === assignedToId) } : t));
+        setEditingTask(null);
+      } else {
+        result = await apiRequest("/api/admin/tasks", "POST", token, formData);
+        const newTaskWithEmployee = {
+          ...result,
+          assignedTo: employees.find((emp) => emp._id === result.assignedTo),
+        };
+        setTasks((prevTasks) => [newTaskWithEmployee, ...prevTasks]);
+        showToast("Task assigned successfully!");
+      }
+
       setNewTask({
         title: "",
         description: "",
@@ -191,9 +210,8 @@ const AdminDashboard = () => {
         dueDate: "",
         taskImage: null,
       });
-      showToast("Task assigned successfully!");
     } catch (err) {
-      console.error("Failed to add task:", err);
+      console.error("Failed to process task:", err);
       showToast(err.message, "error");
     } finally {
       setActionLoading(false);
@@ -219,14 +237,18 @@ const AdminDashboard = () => {
   };
 
   const handleTaskFileChange = (e) => {
-    setNewTask(prev => ({ ...prev, taskImage: e.target.files[0] }));
+    if (editingTask) {
+      setEditingTask(prev => ({ ...prev, taskImage: e.target.files[0] }));
+    } else {
+      setNewTask(prev => ({ ...prev, taskImage: e.target.files[0] }));
+    }
   };
 
   const handleLogout = async () => {
     try {
       await apiRequest("/api/auth/logout", "POST", token);
     } catch (err) {
-      console.error("Logout failed:", err); // Log error but proceed with client-side logout
+      console.error("Logout failed:", err);
     } finally {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -383,9 +405,9 @@ const AdminDashboard = () => {
               visible: { y: 0, opacity: 1 },
             }}
           >
-            <SectionHeader icon={<FiClipboard />} title="Assign New Task" />
+            <SectionHeader icon={<FiClipboard />} title={editingTask ? "Update Task" : "Assign New Task"} />
             <TaskAssignmentForm
-              {...{ newTask, handleInputChange, handleAssignTask, handleTaskFileChange, employees }}
+              {...{ newTask: editingTask || newTask, handleInputChange, handleAssignTask, handleTaskFileChange, employees, isEditing: !!editingTask, cancelEdit: () => setEditingTask(null) }}
             />
           </motion.div>
           <motion.div
@@ -431,7 +453,7 @@ const AdminDashboard = () => {
                   </div>
                 ) : (
                   getFilteredTasks().map((task) => (
-                    <AdminTaskCard key={task._id} task={task} onPreview={handlePreview} />
+                    <AdminTaskCard key={task._id} task={task} onPreview={handlePreview} onEdit={() => setEditingTask(task)} />
                   ))
                 )}
               </AnimatePresence>
@@ -448,7 +470,7 @@ const AdminDashboard = () => {
 
       <AnimatePresence>
         {toast && (
-          <Toast message={toast.message} type={toast.type} 
+          <Toast message={toast.message} type={toast.type}
                  onClose={() => setToast(null)} />
         )}
       </AnimatePresence>
@@ -548,6 +570,8 @@ const TaskAssignmentForm = ({
   handleAssignTask,
   handleTaskFileChange,
   employees,
+  isEditing,
+  cancelEdit
 }) => {
   const commonInputClass =
     "w-full bg-slate-900/80 border border-slate-600 rounded-lg p-4 text-base text-white/90 focus:ring-2 focus:ring-indigo-500 focus:outline-none";
@@ -633,14 +657,30 @@ const TaskAssignmentForm = ({
         </div>
       </div>
 
-      <motion.button
-        type="submit"
-        whileHover={{ scale: 1.02, y: -2 }}
-        whileTap={{ scale: 0.98 }}
-        className="w-full text-sm font-black uppercase tracking-[0.2em] text-white bg-indigo-600 hover:bg-indigo-500 py-5 rounded-2xl transition-all shadow-xl shadow-indigo-500/30 flex items-center justify-center gap-3"
-      >
-        <FiPlus className="text-xl" /> Create Task
-      </motion.button>
+      <div className="flex gap-4">
+        {isEditing && (
+          <motion.button
+            type="button"
+            onClick={cancelEdit}
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-1/3 text-xs font-black uppercase tracking-[0.2em] text-white/40 bg-white/5 hover:bg-white/10 py-5 rounded-2xl transition-all border border-white/5 flex items-center justify-center"
+          >
+            Cancel
+          </motion.button>
+        )}
+        <motion.button
+          type="submit"
+          whileHover={{ scale: 1.02, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          className={clsx("text-sm font-black uppercase tracking-[0.2em] text-white py-5 rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3", 
+            isEditing ? "w-2/3 bg-indigo-600 shadow-indigo-500/30" : "w-full bg-indigo-600 shadow-indigo-500/30"
+          )}
+        >
+          {isEditing ? <FiActivity className="text-xl" /> : <FiPlus className="text-xl" />}
+          {isEditing ? "Update Task" : "Create Task"}
+        </motion.button>
+      </div>
     </form>
   );
 };
@@ -649,20 +689,20 @@ const FileDisplay = ({ filePath, label, isResult = false, onPreview }) => {
   if (!filePath) return null;
   const isImage = /\.(jpeg|jpg|png|webp)$/i.test(filePath);
   const isPDF = /\.pdf$/i.test(filePath);
-  
+
   const containerClass = isResult
     ? "mb-6 rounded-2xl overflow-hidden border border-emerald-500/30 ring-4 ring-emerald-500/5 group cursor-pointer"
     : "mb-6 rounded-2xl overflow-hidden border border-white/5 bg-slate-900 group cursor-pointer";
   const labelText = isResult ? "Result Submission" : "Handout / Brief";
 
   return (
-    <div 
+    <div
       className={containerClass}
       onClick={() => onPreview(filePath)}
     >
       {isImage ? (
         <img
-          src={`http://localhost:5000${filePath}`}
+          src={`${API_BASE_URL}${filePath}`}
           alt={label}
           loading="lazy"
           className="w-full h-auto max-h-56 object-cover transition-transform duration-500 group-hover:scale-105"
@@ -720,7 +760,7 @@ const PreviewModal = ({ filePath, onClose }) => {
           <span className="text-xs font-black uppercase tracking-[0.2em] text-white/40 px-4">
              File Preview
           </span>
-          <button 
+          <button
             onClick={onClose}
             className="p-3 rounded-xl bg-white/5 hover:bg-red-500/20 text-white hover:text-red-400 transition-all border border-white/10"
           >
@@ -730,21 +770,21 @@ const PreviewModal = ({ filePath, onClose }) => {
 
         <div className="flex-1 w-full bg-slate-950 overflow-auto flex items-center justify-center p-4">
           {isImage ? (
-            <img 
-              src={`http://localhost:5000${filePath}`} 
-              alt="Preview" 
+            <img
+              src={`${API_BASE_URL}${filePath}`}
+              alt="Preview"
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
             />
           ) : isPDF ? (
-            <object 
-              data={`http://localhost:5000${filePath}`} 
+            <object
+              data={`${API_BASE_URL}${filePath}`}
               type="application/pdf"
               className="w-full h-full rounded-xl"
             >
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <FiActivity className="text-4xl text-indigo-400" />
                 <p className="text-white/60">PDF preview not supported by your browser.</p>
-                <a href={`http://localhost:5000${filePath}`} target="_blank" className="px-6 py-2 bg-indigo-600 text-white rounded-xl">Open PDF</a>
+                <a href={`${API_BASE_URL}${filePath}`} target="_blank" className="px-6 py-2 bg-indigo-600 text-white rounded-xl">Open PDF</a>
               </div>
             </object>
           ) : (
@@ -756,8 +796,8 @@ const PreviewModal = ({ filePath, onClose }) => {
                   <h3 className="text-2xl font-black text-white mb-2">Native Preview Unavailable</h3>
                   <p className="text-white/40 text-sm font-medium">This file format cannot be viewed directly in the browser.</p>
                </div>
-               <a 
-                 href={`http://localhost:5000${filePath}`} 
+               <a
+                  href={`${API_BASE_URL}${filePath}`}
                  target="_blank"
                  download
                  className="flex items-center justify-center gap-3 w-full py-4 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20"
@@ -772,7 +812,7 @@ const PreviewModal = ({ filePath, onClose }) => {
   );
 };
 
-const AdminTaskCard = memo(({ task, onPreview }) => {
+const AdminTaskCard = memo(({ task, onPreview, onEdit }) => {
   const priorityConfig = {
     High: "text-red-400 bg-red-400/10 border-red-400/20",
     Medium: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
@@ -841,13 +881,26 @@ const AdminTaskCard = memo(({ task, onPreview }) => {
         ) : (
           <div />
         )}
-        <div className="text-right">
+        <div className="flex items-center gap-3">
            <span className={clsx("text-[9px] font-black uppercase tracking-[0.3em] px-3 py-1.5 rounded-xl border", {
              "text-emerald-400 bg-emerald-500/10 border-emerald-500/10": task.status === "Done",
              "text-indigo-400 bg-indigo-500/10 border-indigo-500/10": task.status !== "Done",
            })}>
             {task.status === "Done" ? "Completed" : "In Progress"}
           </span>
+          <Tooltip text={task.status === "Done" ? "Re-assign or Update Task" : "Edit Task Details"}>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onEdit}
+              className="p-2 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 flex items-center gap-2"
+            >
+              <FiActivity size={14} />
+              <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">
+                {task.status === "Done" ? "Re-assign" : "Edit"}
+              </span>
+            </motion.button>
+          </Tooltip>
         </div>
       </div>
     </motion.div>

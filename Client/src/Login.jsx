@@ -59,6 +59,9 @@ const Login = () => {
     setError("");
     setIsLoading(true);
 
+    // Get the API URL from environment variables, with a fallback for local development
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
     try {
       const data = await apiRequest("/api/auth/login", "POST", null, { email, password });
       setIsSuccess(true);
