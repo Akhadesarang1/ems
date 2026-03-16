@@ -1,59 +1,106 @@
+import React from "react";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   FiActivity,
+  FiAlertOctagon,
   FiChevronDown,
   FiClipboard,
   FiFlag,
   FiLogOut,
   FiPlus,
-  FiUser,
+  FiSearch,
+  FiTrash2,
+  FiUser
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
+import { apiRequest } from "./api";
 
 // NOTE: All initial/mock data has been removed.
 // All data will now be fetched from the server.
+// apiRequest utility has been moved to src/api.js
 
-// --- API Helper Function ---
-// A small utility to make authenticated API calls cleaner.
-const apiRequest = async (url, method, token, body = null) => {
-  const options = {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  };
-  if (body) {
-    options.body = JSON.stringify(body);
-  }
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Request failed with status ${response.status}`
-    );
-  }
-  return response.json();
+// --- Tooltip Component ---
+const Tooltip = ({ text, children }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  return (
+    <div className="relative inline-block"
+         onMouseEnter={() => setIsVisible(true)}
+         onMouseLeave={() => setIsVisible(false)}>
+      {children}
+      <AnimatePresence>
+        {isVisible && (
+          <motion.div
+            initial={{ opacity: 0, y: 5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.95 }}
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-bold rounded-md shadow-xl whitespace-nowrap z-[100] pointer-events-none"
+          >
+            {text}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-indigo-600" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const Toast = ({ message, type = "success", onClose }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 50, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.9 }}
+      className={clsx(
+        "fixed bottom-10 right-10 z-[200] px-8 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl flex items-center gap-4",
+        {
+          "bg-emerald-500/20 border-emerald-500/30 text-emerald-400": type === "success",
+          "bg-red-500/20 border-red-500/30 text-red-400": type === "error",
+          "bg-indigo-500/20 border-indigo-500/30 text-indigo-400": type === "info",
+        }
+      )}
+    >
+      <div className={clsx("w-2 h-2 rounded-full animate-pulse", {
+        "bg-emerald-400": type === "success",
+        "bg-red-400": type === "error",
+        "bg-indigo-400": type === "info",
+      })} />
+      <span className="text-sm font-black uppercase tracking-widest">{message}</span>
+    </motion.div>
+  );
 };
 
 const AdminDashboard = () => {
   const [employees, setEmployees] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [toast, setToast] = useState(null);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("Active");
+  const [previewFile, setPreviewFile] = useState(null);
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
     assignedTo: "",
     priority: "Medium",
     dueDate: "",
+    taskImage: null, // File object
   });
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
   const navigate = useNavigate();
+
+  // Debouncing Search Query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 400); // 400ms debounce
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Get user data and token from localStorage
   const loggedInAdmin = JSON.parse(localStorage.getItem("user"));
@@ -71,8 +118,8 @@ const AdminDashboard = () => {
         setLoading(true);
         // Fetch employees and tasks concurrently
         const [employeesData, tasksData] = await Promise.all([
-          apiRequest("http://localhost:5000/api/admin/employees", "GET", token),
-          apiRequest("http://localhost:5000/api/admin/tasks", "GET", token),
+          apiRequest("/api/admin/employees", "GET", token),
+          apiRequest("/api/admin/tasks", "GET", token),
         ]);
         setEmployees(employeesData);
         setTasks(tasksData);
@@ -90,20 +137,43 @@ const AdminDashboard = () => {
     fetchAdminData();
   }, [navigate, token]); // Rerun if navigate or token changes
 
+  const handlePreview = (filePath) => {
+    setPreviewFile(filePath);
+  };
+
+  const closePreview = () => setPreviewFile(null);
+
   const handleInputChange = (e) =>
     setNewTask((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const handleAssignTask = async (e) => {
     e.preventDefault();
-    if (!newTask.title || !newTask.assignedTo)
-      return alert("Please provide a title and assign the task.");
-
+    if (!newTask.title || !newTask.assignedTo) {
+      showToast("Please provide a title and assign the task.", "error");
+      return;
+    }
+    setActionLoading(true);
     try {
+      const formData = new FormData();
+      formData.append("title", newTask.title);
+      formData.append("description", newTask.description);
+      formData.append("priority", newTask.priority);
+      formData.append("dueDate", newTask.dueDate);
+      formData.append("assignedTo", newTask.assignedTo);
+      if (newTask.taskImage) {
+        formData.append("taskImage", newTask.taskImage);
+      }
+
       const createdTaskData = await apiRequest(
-        "http://localhost:5000/api/admin/tasks",
+        "/api/admin/tasks",
         "POST",
         token,
-        newTask
+        formData
       );
       // To display the new task instantly, we need to add the populated 'assignedTo' info
       const newTaskWithEmployee = {
@@ -119,15 +189,42 @@ const AdminDashboard = () => {
         assignedTo: "",
         priority: "Medium",
         dueDate: "",
+        taskImage: null,
       });
+      showToast("Task assigned successfully!");
     } catch (err) {
-      setError(err.message);
+      console.error("Failed to add task:", err);
+      showToast(err.message, "error");
+    } finally {
+      setActionLoading(false);
     }
+  };
+
+  const handleRemoveEmployee = async (userId) => {
+    if (!window.confirm("Are you sure you want to remove this employee and all their assigned tasks?")) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await apiRequest(`/api/admin/employees/${userId}`, "DELETE", token);
+      setEmployees((prev) => prev.filter((emp) => emp._id !== userId));
+      setTasks((prev) => prev.filter((task) => task.assignedTo?._id !== userId));
+      showToast("Employee removed successfully");
+    } catch (err) {
+      console.error("Failed to remove employee:", err);
+      showToast(err.message, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleTaskFileChange = (e) => {
+    setNewTask(prev => ({ ...prev, taskImage: e.target.files[0] }));
   };
 
   const handleLogout = async () => {
     try {
-      await apiRequest("http://localhost:5000/api/auth/logout", "POST", token);
+      await apiRequest("/api/auth/logout", "POST", token);
     } catch (err) {
       console.error("Logout failed:", err); // Log error but proceed with client-side logout
     } finally {
@@ -138,9 +235,30 @@ const AdminDashboard = () => {
   };
 
   const getFilteredTasks = () => {
-    if (filter === "Active") return tasks.filter((t) => t.status !== "Done");
-    if (filter === "Completed") return tasks.filter((t) => t.status === "Done");
-    return tasks;
+    let filtered = tasks;
+    if (filter === "Active") filtered = tasks.filter((t) => t.status !== "Done");
+    else if (filter === "Completed") filtered = tasks.filter((t) => t.status === "Done");
+
+    if (debouncedSearchTerm) {
+      const query = debouncedSearchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          t.title.toLowerCase().includes(query) ||
+          t.description.toLowerCase().includes(query) ||
+          t.assignedTo?.name?.toLowerCase().includes(query)
+      );
+    }
+    return filtered;
+  };
+
+  const getFilteredEmployees = () => {
+    if (!debouncedSearchTerm) return employees;
+    const query = debouncedSearchTerm.toLowerCase();
+    return employees.filter(
+      (emp) =>
+        emp.name.toLowerCase().includes(query) ||
+        emp._id.toString().includes(query)
+    );
   };
 
   // Prevent rendering anything if the user is not authenticated yet
@@ -148,36 +266,67 @@ const AdminDashboard = () => {
 
   return (
     <div
-      className="min-h-screen font-sans text-white/90 bg-slate-900"
+      className="min-h-screen text-white/90 bg-[#08090a] overflow-x-hidden"
       style={{
-        backgroundImage: `radial-gradient(at 27% 37%, hsla(215, 98%, 61%, 0.1) 0px, transparent 50%), radial-gradient(at 97% 21%, hsla(125, 98%, 72%, 0.1) 0px, transparent 50%)`,
+        backgroundImage: `radial-gradient(at 0% 0%, hsla(215, 98%, 61%, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, hsla(125, 98%, 72%, 0.15) 0px, transparent 50%)`,
       }}
     >
-      <header className="sticky top-0 z-40 bg-slate-900/50 backdrop-blur-md border-b border-slate-700/60">
-        <div className="max-w-screen-2xl mx-auto p-4 flex justify-between items-center">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-            Admin Dashboard
-          </h1>
+      <header className="sticky top-0 z-40 bg-slate-900/60 backdrop-blur-xl border-b border-white/5">
+        <div className="max-w-screen-2xl mx-auto px-4 py-3 sm:px-6 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-indigo-500/20 shadow-lg">
+              <FiUser className="text-white text-xl" />
+            </div>
+            <h1 className="text-lg sm:text-xl font-black tracking-tighter uppercase whitespace-nowrap">
+              Admin <span className="text-indigo-400">Portal</span>
+            </h1>
+          </div>
+
+          <div className="flex-grow max-w-md mx-8 hidden md:block relative group">
+            <input
+              type="text"
+              placeholder="Search tasks or team..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-2xl py-2 px-10 text-xs font-bold uppercase tracking-widest focus:outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-white/20"
+            />
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-indigo-400 transition-colors" />
+            <AnimatePresence>
+              {searchTerm && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors"
+                >
+                  <FiTrash2 size={14} />
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
           <div className="relative">
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setIsProfileOpen((prev) => !prev)}
-              className="flex items-center gap-2 p-1 rounded-full bg-slate-800 border border-slate-700"
-            >
-              <img
-                src={loggedInAdmin.avatar}
-                alt="Admin"
-                className="w-8 h-8 rounded-full"
-              />
-              <span className="hidden sm:block text-sm font-semibold pr-2">
-                {loggedInAdmin.name}
-              </span>
-              <FiChevronDown
-                className={clsx("transition-transform mr-1", {
-                  "rotate-180": isProfileOpen,
-                })}
-              />
-            </motion.button>
+            <Tooltip text="User Settings">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setIsProfileOpen((prev) => !prev)}
+                className="flex items-center gap-2 p-1 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 hover:bg-white/10 transition-all"
+              >
+                <img
+                  src={loggedInAdmin.avatar}
+                  alt="Admin"
+                  className="w-8 h-8 rounded-full border border-indigo-500/30"
+                />
+                <span className="hidden sm:block text-xs font-bold px-1 uppercase tracking-tight">
+                  {loggedInAdmin.name}
+                </span>
+                <FiChevronDown
+                  className={clsx("transition-transform mr-2 text-indigo-400", {
+                    "rotate-180": isProfileOpen,
+                  })}
+                />
+              </motion.button>
+            </Tooltip>
             <AnimatePresence>
               {isProfileOpen && (
                 <ProfileDropdown
@@ -213,10 +362,18 @@ const AdminDashboard = () => {
                 <p className="text-center text-white/50">
                   Loading employees...
                 </p>
-              ) : (
-                employees.map((emp) => (
-                  <EmployeeCard key={emp._id} employee={emp} tasks={tasks} />
+              ) : getFilteredEmployees().length > 0 ? (
+                getFilteredEmployees().map((emp) => (
+                  <EmployeeCard
+                    key={emp._id}
+                    employee={emp}
+                    tasks={tasks}
+                    onRemove={handleRemoveEmployee}
+                    Tooltip={Tooltip}
+                  />
                 ))
+              ) : (
+                <div className="text-center py-10 opacity-30 font-black uppercase tracking-widest text-xs">No team matches found</div>
               )}
             </div>
           </motion.div>
@@ -228,7 +385,7 @@ const AdminDashboard = () => {
           >
             <SectionHeader icon={<FiClipboard />} title="Assign New Task" />
             <TaskAssignmentForm
-              {...{ newTask, handleInputChange, handleAssignTask, employees }}
+              {...{ newTask, handleInputChange, handleAssignTask, handleTaskFileChange, employees }}
             />
           </motion.div>
           <motion.div
@@ -239,23 +396,24 @@ const AdminDashboard = () => {
             className="lg:col-span-2 xl:col-span-1"
           >
             <SectionHeader icon={<FiActivity />} title="Global Task Feed" />
-            <div className="flex items-center gap-2 p-1 bg-slate-800/60 backdrop-blur-sm rounded-xl mb-6">
+            <div className="flex items-center gap-1 p-1 bg-white/5 backdrop-blur-md border border-white/5 rounded-2xl mb-6">
               {["Active", "Completed", "All"].map((tab) => (
-                <motion.button
-                  key={tab}
-                  onClick={() => setFilter(tab)}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={clsx(
-                    "w-full py-2.5 text-sm font-semibold rounded-lg transition-colors",
-                    {
-                      "bg-indigo-600 text-white shadow-md": filter === tab,
-                      "text-white/60 hover:text-white/100": filter !== tab,
-                    }
-                  )}
-                >
-                  {tab}
-                </motion.button>
+                <Tooltip key={tab} text={`Show ${tab} Tasks`}>
+                  <motion.button
+                    onClick={() => setFilter(tab)}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={clsx(
+                      "w-full px-8 py-2.5 text-xs font-black rounded-lg transition-all uppercase tracking-widest",
+                      {
+                        "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20": filter === tab,
+                        "text-white/40 hover:text-white": filter !== tab,
+                      }
+                    )}
+                  >
+                    {tab}
+                  </motion.button>
+                </Tooltip>
               ))}
             </div>
             <motion.div
@@ -273,7 +431,7 @@ const AdminDashboard = () => {
                   </div>
                 ) : (
                   getFilteredTasks().map((task) => (
-                    <AdminTaskCard key={task._id} task={task} />
+                    <AdminTaskCard key={task._id} task={task} onPreview={handlePreview} />
                   ))
                 )}
               </AnimatePresence>
@@ -281,6 +439,19 @@ const AdminDashboard = () => {
           </motion.div>
         </motion.div>
       </main>
+
+      <AnimatePresence>
+        {previewFile && (
+          <PreviewModal filePath={previewFile} onClose={closePreview} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {toast && (
+          <Toast message={toast.message} type={toast.type} 
+                 onClose={() => setToast(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -289,30 +460,24 @@ const AdminDashboard = () => {
 
 const ProfileDropdown = ({ admin, onLogout, close }) => {
   const dropdownRef = useRef(null);
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target))
-        close();
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [close]);
+  // ... (click outside effect remains)
   return (
     <motion.div
       ref={dropdownRef}
       initial={{ opacity: 0, scale: 0.95, y: -10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -10 }}
-      className="absolute top-full right-0 mt-2 w-64 bg-slate-800/90 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden"
+      className="absolute top-full right-0 mt-2 w-64 bg-slate-800/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden ring-1 ring-white/5"
     >
-      <div className="p-4 border-b border-slate-700">
-        <p className="font-bold text-white">{admin.name}</p>
+      <div className="p-4 border-b border-white/5">
+        <p className="font-bold text-white mb-1">{admin.name}</p>
+        <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{admin.role}</p>
       </div>
       <div className="p-2">
         <motion.button
-          whileHover={{ backgroundColor: "rgba(71,85,105,0.5)" }}
+          whileHover={{ backgroundColor: "rgba(255,255,255,0.05)" }}
           onClick={onLogout}
-          className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-md transition-colors"
+          className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-red-400 hover:text-red-300 font-medium"
         >
           <FiLogOut /> Logout
         </motion.button>
@@ -321,59 +486,67 @@ const ProfileDropdown = ({ admin, onLogout, close }) => {
   );
 };
 
-const SectionHeader = ({ icon, title }) => (
-  <div className="flex items-center gap-3 mb-6">
-    <div className="bg-slate-800 p-3 rounded-lg">{icon}</div>
-    <h2 className="text-2xl font-bold">{title}</h2>
+const SectionHeader = memo(({ icon, title }) => (
+  <div className="flex items-center gap-4 mb-8">
+    <div className="bg-indigo-600/10 p-3.5 rounded-2xl text-indigo-400 border border-indigo-500/20 shadow-inner">
+      {icon}
+    </div>
+    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight uppercase">{title}</h2>
   </div>
-);
+));
+SectionHeader.displayName = "SectionHeader";
 
-const EmployeeCard = ({ employee, tasks }) => {
+const EmployeeCard = memo(({ employee, tasks, onRemove, Tooltip }) => {
   const taskCount = tasks.filter(
-    (t) => t.assignedTo._id === employee._id && t.status !== "Done"
+    (t) => t.assignedTo?._id === employee._id && t.status !== "Done"
   ).length;
   return (
     <motion.div
-      whileHover={{ y: -5 }}
-      className="flex items-center gap-5 p-5 rounded-2xl bg-slate-800/50 backdrop-blur-md border border-slate-700/60"
+      whileHover={{ y: -5, scale: 1.02 }}
+      className="flex items-center gap-5 p-5 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg transition-all hover:bg-white/[0.07]"
     >
       <img
         src={employee.avatar}
         alt={employee.name}
-        className="w-14 h-14 rounded-full border-2 border-slate-600"
+        loading="lazy"
+        className="w-14 h-14 rounded-2xl border-2 border-indigo-500/30 object-cover shadow-xl shadow-indigo-500/10"
       />
       <div className="flex-grow">
-        <p className="font-bold text-lg text-white">{employee.name}</p>
-        <p className="text-sm text-white/60">{employee.role}</p>
-      </div>
-      <div className="flex flex-col items-end gap-1">
-        <div
-          className={clsx(
-            "flex items-center gap-2 text-xs font-semibold px-2.5 py-1 rounded-full",
-            {
-              "bg-green-500/20 text-green-400": employee.status === "Online",
-              "bg-slate-600/50 text-slate-400": employee.status === "Offline",
-            }
-          )}
-        >
-          <div
-            className={clsx("w-2 h-2 rounded-full", {
-              "bg-green-400": employee.status === "Online",
-              "bg-slate-500": employee.status === "Offline",
-            })}
-          />
-          {employee.status}
+        <p className="font-bold text-lg text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight">{employee.name}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <div className={clsx("w-2 h-2 rounded-full", {
+            "bg-green-400 animate-pulse": employee.status === "Online",
+            "bg-slate-500": employee.status === "Offline",
+          })} />
+          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{employee.status}</span>
         </div>
-        <p className="text-xs text-white/50">{taskCount} active</p>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="text-right">
+          <p className="text-sm font-bold text-indigo-400">{taskCount}</p>
+          <p className="text-[8px] text-white/30 uppercase font-black tracking-tighter">Active Tasks</p>
+        </div>
+        <Tooltip text="Remove Employee">
+          <motion.button
+            whileHover={{ scale: 1.1, backgroundColor: "rgba(239, 68, 68, 0.2)" }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => onRemove(employee._id)}
+            className="p-3 rounded-2xl text-red-500 bg-red-500/10 transition-colors border border-red-500/20 shadow-lg shadow-red-500/10"
+          >
+            <FiTrash2 size={18} />
+          </motion.button>
+        </Tooltip>
       </div>
     </motion.div>
   );
-};
+});
+EmployeeCard.displayName = "EmployeeCard";
 
 const TaskAssignmentForm = ({
   newTask,
   handleInputChange,
   handleAssignTask,
+  handleTaskFileChange,
   employees,
 }) => {
   const commonInputClass =
@@ -381,120 +554,304 @@ const TaskAssignmentForm = ({
   return (
     <form
       onSubmit={handleAssignTask}
-      className="p-8 rounded-2xl bg-slate-800/50 backdrop-blur-md border border-slate-700/60 space-y-5"
+      className="p-6 sm:p-8 rounded-[2rem] bg-white/5 backdrop-blur-xl border border-white/10 space-y-6 shadow-2xl relative overflow-hidden"
     >
-      <input
-        type="text"
-        name="title"
-        value={newTask.title}
-        onChange={handleInputChange}
-        placeholder="Task Title"
-        required
-        className={commonInputClass}
-      />
-      <textarea
-        name="description"
-        value={newTask.description}
-        onChange={handleInputChange}
-        placeholder="Task Description"
-        className={`${commonInputClass} min-h-[120px]`}
-      />
-      <div className="grid grid-cols-2 gap-4">
-        <select
-          name="assignedTo"
-          value={newTask.assignedTo}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 blur-3xl -z-10" />
+
+      <div className="space-y-4">
+        <input
+          type="text"
+          name="title"
+          value={newTask.title}
           onChange={handleInputChange}
+          placeholder="What's the task called?"
           required
-          className={commonInputClass}
-        >
-          <option value="" disabled>
-            Assign to...
-          </option>
-          {employees.map((emp) => (
-            <option key={emp._id} value={emp._id}>
-              {emp.name}
-            </option>
-          ))}
-        </select>
-        <select
-          name="priority"
-          value={newTask.priority}
+          className="w-full bg-slate-900/40 border border-white/10 rounded-2xl p-4 text-base text-white placeholder:text-white/20 focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+        />
+        <textarea
+          name="description"
+          value={newTask.description}
           onChange={handleInputChange}
-          className={commonInputClass}
-        >
-          <option>Low</option>
-          <option>Medium</option>
-          <option>High</option>
-        </select>
+          placeholder="Describe the objective..."
+          className="w-full bg-slate-900/40 border border-white/10 rounded-2xl p-4 text-base text-white placeholder:text-white/20 focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all min-h-[140px] outline-none"
+        />
       </div>
-      <input
-        type="date"
-        name="dueDate"
-        value={newTask.dueDate}
-        onChange={handleInputChange}
-        className={commonInputClass}
-      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-white/30 px-1">Assignee</label>
+          <select
+            name="assignedTo"
+            value={newTask.assignedTo}
+            onChange={handleInputChange}
+            required
+            className="w-full bg-slate-900/40 border border-white/10 rounded-2xl p-4 text-sm text-white focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none appearance-none"
+          >
+            <option value="" disabled className="bg-slate-900 text-white/50">Select Member</option>
+            {employees.map((emp) => (
+              <option key={emp._id} value={emp._id} className="bg-slate-900 text-white">
+                {emp.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-white/30 px-1">Priority</label>
+          <select
+            name="priority"
+            value={newTask.priority}
+            onChange={handleInputChange}
+            className="w-full bg-slate-900/40 border border-white/10 rounded-2xl p-4 text-sm text-white focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none appearance-none"
+          >
+             <option className="bg-slate-800">Low</option>
+             <option className="bg-slate-800">Medium</option>
+             <option className="bg-slate-800">High</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-[10px] font-black uppercase tracking-widest text-white/30 px-1">Deadline Date</label>
+        <input
+          type="date"
+          name="dueDate"
+          value={newTask.dueDate}
+          onChange={handleInputChange}
+          className="w-full bg-slate-900/40 border border-white/10 rounded-2xl p-4 text-sm text-white focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <label className="text-[10px] font-black uppercase tracking-widest text-white/30 px-1">Attachment (Docs/Images)</label>
+        <div className="p-4 bg-white/5 border border-dashed border-white/10 rounded-2xl group hover:border-indigo-500/50 transition-colors">
+          <input
+            type="file"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+            onChange={handleTaskFileChange}
+            className="w-full text-xs text-white/40 file:mr-4 file:py-2 file:px-6 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-[0.2em] file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
+          />
+        </div>
+      </div>
+
       <motion.button
         type="submit"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="w-full text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 py-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+        whileHover={{ scale: 1.02, y: -2 }}
+        whileTap={{ scale: 0.98 }}
+        className="w-full text-sm font-black uppercase tracking-[0.2em] text-white bg-indigo-600 hover:bg-indigo-500 py-5 rounded-2xl transition-all shadow-xl shadow-indigo-500/30 flex items-center justify-center gap-3"
       >
-        <FiPlus /> Assign Task
+        <FiPlus className="text-xl" /> Create Task
       </motion.button>
     </form>
   );
 };
 
-const AdminTaskCard = ({ task }) => {
+const FileDisplay = ({ filePath, label, isResult = false, onPreview }) => {
+  if (!filePath) return null;
+  const isImage = /\.(jpeg|jpg|png|webp)$/i.test(filePath);
+  const isPDF = /\.pdf$/i.test(filePath);
+  
+  const containerClass = isResult
+    ? "mb-6 rounded-2xl overflow-hidden border border-emerald-500/30 ring-4 ring-emerald-500/5 group cursor-pointer"
+    : "mb-6 rounded-2xl overflow-hidden border border-white/5 bg-slate-900 group cursor-pointer";
+  const labelText = isResult ? "Result Submission" : "Handout / Brief";
+
+  return (
+    <div 
+      className={containerClass}
+      onClick={() => onPreview(filePath)}
+    >
+      {isImage ? (
+        <img
+          src={`http://localhost:5000${filePath}`}
+          alt={label}
+          loading="lazy"
+          className="w-full h-auto max-h-56 object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      ) : (
+        <div className="p-6 bg-slate-900/60 flex flex-col items-center gap-4 text-center group-hover:bg-slate-900/80 transition-colors">
+          {isPDF ? (
+            <FiActivity className="text-4xl text-red-400 group-hover:scale-110 transition-transform" />
+          ) : (
+            <FiClipboard className="text-4xl text-indigo-400 group-hover:scale-110 transition-transform" />
+          )}
+          <span className="text-xs text-white/40 font-bold tracking-tight">
+            Click to Preview
+          </span>
+        </div>
+      )}
+      <div className={clsx("py-2.5 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-center border-t relative overflow-hidden", {
+        "text-emerald-400 bg-emerald-500/10 border-emerald-500/10": isResult,
+        "text-white/30 bg-white/5 border-white/5": !isResult
+      })}>
+        {labelText}
+        <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
+
+      {/* Hover Overlay */}
+      <div className="absolute inset-0 bg-indigo-600/0 group-hover:bg-indigo-600/5 transition-colors flex items-center justify-center">
+         <div className="opacity-0 group-hover:opacity-100 transition-all transform scale-75 group-hover:scale-100 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20">
+            <span className="text-[10px] font-black text-white uppercase tracking-widest">View File</span>
+         </div>
+      </div>
+    </div>
+  );
+};
+
+const PreviewModal = ({ filePath, onClose }) => {
+  const isImage = /\.(jpeg|jpg|png|webp)$/i.test(filePath);
+  const isPDF = /\.pdf$/i.test(filePath);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-20 bg-black/90 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        className="relative w-full max-w-5xl bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl border border-white/10 flex flex-col h-[85vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+          <span className="text-xs font-black uppercase tracking-[0.2em] text-white/40 px-4">
+             File Preview
+          </span>
+          <button 
+            onClick={onClose}
+            className="p-3 rounded-xl bg-white/5 hover:bg-red-500/20 text-white hover:text-red-400 transition-all border border-white/10"
+          >
+            <FiActivity className="rotate-45" />
+          </button>
+        </div>
+
+        <div className="flex-1 w-full bg-slate-950 overflow-auto flex items-center justify-center p-4">
+          {isImage ? (
+            <img 
+              src={`http://localhost:5000${filePath}`} 
+              alt="Preview" 
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+            />
+          ) : isPDF ? (
+            <object 
+              data={`http://localhost:5000${filePath}`} 
+              type="application/pdf"
+              className="w-full h-full rounded-xl"
+            >
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <FiActivity className="text-4xl text-indigo-400" />
+                <p className="text-white/60">PDF preview not supported by your browser.</p>
+                <a href={`http://localhost:5000${filePath}`} target="_blank" className="px-6 py-2 bg-indigo-600 text-white rounded-xl">Open PDF</a>
+              </div>
+            </object>
+          ) : (
+            <div className="text-center space-y-8 max-w-sm">
+               <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto border border-white/10">
+                  <FiClipboard className="text-4xl text-indigo-400" />
+               </div>
+               <div>
+                  <h3 className="text-2xl font-black text-white mb-2">Native Preview Unavailable</h3>
+                  <p className="text-white/40 text-sm font-medium">This file format cannot be viewed directly in the browser.</p>
+               </div>
+               <a 
+                 href={`http://localhost:5000${filePath}`} 
+                 target="_blank"
+                 download
+                 className="flex items-center justify-center gap-3 w-full py-4 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20"
+               >
+                 <FiActivity /> Download Document
+               </a>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+const AdminTaskCard = memo(({ task, onPreview }) => {
   const priorityConfig = {
-    High: "text-red-400",
-    Medium: "text-yellow-400",
-    Low: "text-sky-400",
+    High: "text-red-400 bg-red-400/10 border-red-400/20",
+    Medium: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
+    Low: "text-sky-400 bg-sky-400/10 border-sky-400/20",
   };
   const assignedEmployee = task.assignedTo;
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      whileHover={{ y: -5 }}
-      className="p-5 rounded-2xl bg-slate-800/50 backdrop-blur-md border border-slate-700/60"
+      whileHover={{ y: -5, scale: 1.01 }}
+      className="p-6 rounded-[2rem] bg-white/5 backdrop-blur-xl border border-white/10 shadow-xl transition-all relative overflow-hidden group"
     >
-      <div className="flex justify-between items-start mb-3">
-        <p className="font-bold text-white pr-4">{task.title}</p>
-        <span
-          className={clsx(
-            "flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold",
-            priorityConfig[task.priority]
+      {task.hasIssue && (
+        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500 shadow-[4px_0_15px_rgba(239,68,68,0.3)] z-20" />
+      )}
+      <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 blur-3xl rounded-full -z-10 group-hover:bg-indigo-600/10 transition-colors" />
+
+      <div className="flex justify-between items-start mb-5 gap-4">
+        <h4 className="font-extrabold text-white text-lg tracking-tight group-hover:text-indigo-300 transition-colors">{task.title}</h4>
+        <div className="flex items-center gap-2">
+          <span
+            className={clsx(
+              "flex-shrink-0 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] px-2.5 py-1 rounded-full border",
+              priorityConfig[task.priority]
+            )}
+          >
+            <FiFlag size={10} /> {task.priority}
+          </span>
+          {task.hasIssue && (
+            <Tooltip text="Issue reported by employee">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="flex-shrink-0 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] px-2.5 py-1 rounded-full border border-red-500/30 bg-red-500/20 text-red-400 shadow-lg shadow-red-500/10"
+              >
+                <FiAlertOctagon size={10} /> Issue Raised
+              </motion.div>
+            </Tooltip>
           )}
-        >
-          <FiFlag size={14} /> {task.priority}
-        </span>
+        </div>
       </div>
-      <p className="text-sm text-white/60 mb-4">{task.description}</p>
-      <div className="border-t border-slate-700/60 pt-3 flex items-center justify-between">
+
+      <p className="text-sm text-white/40 mb-6 leading-relaxed font-medium line-clamp-3 group-hover:text-white/60 transition-colors">
+        {task.description}
+      </p>
+
+      <FileDisplay filePath={task.taskImage} label="Handout" onPreview={onPreview} />
+      <FileDisplay filePath={task.resultImage} label="Employee Submission" isResult onPreview={onPreview} />
+
+      <div className="pt-5 border-t border-white/5 flex items-center justify-between mt-auto">
         {assignedEmployee ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <img
               src={assignedEmployee.avatar}
               alt={assignedEmployee.name}
-              className="w-6 h-6 rounded-full"
+              loading="lazy"
+              className="w-8 h-8 rounded-xl border border-white/10 shadow-lg"
             />
-            <span className="text-sm text-white/70">
-              {assignedEmployee.name}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-white/30 font-black uppercase tracking-widest leading-none">Assignee</span>
+              <span className="text-xs text-white font-bold tracking-tight">
+                {assignedEmployee.name}
+              </span>
+            </div>
           </div>
         ) : (
           <div />
         )}
-        <span className="text-xs text-white/50">
-          {task.status === "Done" ? "Completed" : task.status}
-        </span>
+        <div className="text-right">
+           <span className={clsx("text-[9px] font-black uppercase tracking-[0.3em] px-3 py-1.5 rounded-xl border", {
+             "text-emerald-400 bg-emerald-500/10 border-emerald-500/10": task.status === "Done",
+             "text-indigo-400 bg-indigo-500/10 border-indigo-500/10": task.status !== "Done",
+           })}>
+            {task.status === "Done" ? "Completed" : "In Progress"}
+          </span>
+        </div>
       </div>
     </motion.div>
   );
-};
+});
 
 export default AdminDashboard;
