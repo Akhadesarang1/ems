@@ -224,7 +224,7 @@ const seedAdminUsers = async () => {
 
 // --- MongoDB Connection ---
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URL || process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB connected successfully.");
     seedAdminUsers();
@@ -550,17 +550,6 @@ app.put(
 );
 
 
-// --- Serve Static Files for Production ---
-if (process.env.NODE_ENV === "production") {
-  // Correct path: Go up one level from /Server, then into /Client/dist
-  app.use(express.static(path.join(__dirname, "..", "Client", "dist")));
-
-  // The "catchall" handler: for any request that doesn't
-  // match one above, send back React's index.html file.
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "Client", "dist", "index.html"));
-  });
-}
 
 // --- Global Error Handler ---
 app.use((err, req, res, next) => {
