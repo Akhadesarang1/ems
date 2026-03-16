@@ -116,9 +116,6 @@ const AdminDashboard = () => {
     const fetchAdminData = async () => {
       try {
         setLoading(true);
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-        // Fetch employees and tasks concurrently with the correct URLs
         const [employeesData, tasksData] = await Promise.all([
           apiRequest("/api/admin/employees", "GET", token),
           apiRequest("/api/admin/tasks", "GET", token),

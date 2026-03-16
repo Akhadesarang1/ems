@@ -617,7 +617,7 @@ const FileDisplay = ({ filePath, label, isResult = false, onPreview }) => {
     >
       {isImage ? (
         <img
-          src={`http://localhost:5000${filePath}`}
+          src={`${API_BASE_URL}${filePath}`}
           alt={label}
           loading="lazy"
           crossOrigin="anonymous"
