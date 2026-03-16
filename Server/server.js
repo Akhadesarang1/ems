@@ -1,17 +1,27 @@
+<<<<<<< HEAD
+=======
+
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
+<<<<<<< HEAD
 const path = require("path"); // For serving static files
 const fs = require("fs");
 const multer = require("multer");
 const helmet = require("helmet"); // For security headers
+=======
+const path = require("path");
+const helmet = require("helmet");
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 
 require("dotenv").config();
 
 const app = express();
+<<<<<<< HEAD
 const https = require("https"); // For keep-alive self-ping
 const PORT = process.env.PORT || 5000;
 
@@ -34,10 +44,20 @@ app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
+=======
+const PORT = process.env.PORT || 5000;
+
+// --- Security and CORS Middleware ---
+app.use(helmet());
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
   })
 );
 app.use(bodyParser.json());
 
+<<<<<<< HEAD
 // --- Request Logging Middleware ---
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -91,6 +111,8 @@ app.use("/uploads", (req, res, next) => {
   next();
 }, express.static("uploads"));
 
+=======
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 // --- Helper function for generating a unique color from username ---
 const stringToColor = (str) => {
   let hash = 0;
@@ -164,13 +186,17 @@ const TaskSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+<<<<<<< HEAD
     taskImage: { type: String }, // Image uploaded by admin
     resultImage: { type: String }, // Image uploaded by employee (result)
+=======
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
   },
   { timestamps: true }
 );
 const Task = mongoose.model("Task", TaskSchema);
 
+<<<<<<< HEAD
 const NotificationSchema = new mongoose.Schema(
   {
     recipient: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
@@ -183,6 +209,8 @@ const NotificationSchema = new mongoose.Schema(
 );
 const Notification = mongoose.model("Notification", NotificationSchema);
 
+=======
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 // --- Admin User Seeding Function ---
 const seedAdminUsers = async () => {
   try {
@@ -236,6 +264,7 @@ mongoose.connection.on("error", (err) => {
 
 // --- JWT Middleware ---
 const authenticateToken = (req, res, next) => {
+<<<<<<< HEAD
   console.log(`[AUTH DEBUG] authenticateToken called for ${req.method} ${req.url}`);
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -250,6 +279,14 @@ const authenticateToken = (req, res, next) => {
       console.error(`[AUTH DEBUG] Token verification failed: ${err.message}`);
       return res.status(403).json({ message: "Invalid or expired token" });
     }
+=======
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  if (token == null) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
     req.user = user;
     next();
   });
@@ -262,6 +299,7 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
+<<<<<<< HEAD
 
 // --- Render Keep-Alive ---
 // This keeps the Render free tier from sleeping by pinging it every 14 minutes.
@@ -303,6 +341,9 @@ app.put("/api/notifications/:id/read", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Error updating notification", error: error.message });
   }
 });
+=======
+// --- API Routes ---
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 
 app.post("/api/auth/signup", async (req, res) => {
   try {
@@ -357,7 +398,11 @@ app.post("/api/auth/login", async (req, res) => {
       avatar: user.avatar,
     };
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+<<<<<<< HEAD
       expiresIn: "30d",
+=======
+      expiresIn: "8h",
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
     });
     res.json({ token, user: tokenPayload });
   } catch (error) {
@@ -396,6 +441,7 @@ app.get(
   }
 );
 
+<<<<<<< HEAD
 app.delete(
   "/api/admin/employees/:userId",
   authenticateToken,
@@ -426,6 +472,8 @@ app.delete(
 );
 
 
+=======
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 app.get("/api/admin/tasks", authenticateToken, isAdmin, async (req, res) => {
   try {
     const tasks = await Task.find()
@@ -439,6 +487,7 @@ app.get("/api/admin/tasks", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 app.post(
   "/api/admin/tasks",
   authenticateToken,
@@ -484,6 +533,30 @@ app.post(
     }
   }
 );
+=======
+app.post("/api/admin/tasks", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { title, description, assignedTo, priority, dueDate } = req.body;
+    if (!title || !assignedTo)
+      return res
+        .status(400)
+        .json({ message: "Title and assigned employee are required" });
+
+    const newTask = await Task.create({
+      title,
+      description,
+      assignedTo,
+      priority,
+      dueDate,
+    });
+    res.status(201).json(newTask);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error creating task.", error: error.message });
+  }
+});
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 
 app.get("/api/tasks", authenticateToken, async (req, res) => {
   try {
@@ -498,6 +571,7 @@ app.get("/api/tasks", authenticateToken, async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 app.put(
   "/api/tasks/:taskId",
   authenticateToken,
@@ -549,19 +623,55 @@ app.put(
   }
 );
 
+=======
+app.put("/api/tasks/:taskId", authenticateToken, async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { description, status, hasIssue } = req.body;
+    const task = await Task.findById(taskId);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    if (
+      task.assignedTo.toString() !== req.user.id &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to update this task." });
+    }
+
+    if (description !== undefined) task.description = description;
+    if (status !== undefined) task.status = status;
+    if (hasIssue !== undefined) task.hasIssue = hasIssue;
+
+    const updatedTask = await task.save();
+    res.json(updatedTask);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error updating task.", error: error.message });
+  }
+});
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 
 // --- Serve Static Files for Production ---
 if (process.env.NODE_ENV === "production") {
   // Correct path: Go up one level from /Server, then into /Client/dist
   app.use(express.static(path.join(__dirname, "..", "Client", "dist")));
 
+<<<<<<< HEAD
   // The "catchall" handler: for any request that doesn't
   // match one above, send back React's index.html file.
   app.get("*", (req, res) => {
+=======
+  // The "catchall" handler
+  app.get("/*", (req, res) => {
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
     res.sendFile(path.join(__dirname, "..", "Client", "dist", "index.html"));
   });
 }
 
+<<<<<<< HEAD
 // --- Global Error Handler ---
 app.use((err, req, res, next) => {
   console.error("FATAL ERROR:", err);
@@ -580,6 +690,8 @@ app.use((err, req, res, next) => {
   });
 });
 
+=======
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 app.listen(PORT, () =>
   console.log(`Server is running on http://localhost:${PORT}`)
 );

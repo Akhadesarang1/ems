@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React from "react";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
@@ -5,11 +6,19 @@ import { memo, useEffect, useRef, useState } from "react";
 import {
   FiActivity,
   FiAlertOctagon,
+=======
+import clsx from "clsx";
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import {
+  FiActivity,
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
   FiChevronDown,
   FiClipboard,
   FiFlag,
   FiLogOut,
   FiPlus,
+<<<<<<< HEAD
   FiSearch,
   FiTrash2,
   FiUser
@@ -69,23 +78,55 @@ const Toast = ({ message, type = "success", onClose }) => {
       <span className="text-sm font-black uppercase tracking-widest">{message}</span>
     </motion.div>
   );
+=======
+  FiUser,
+} from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
+
+// --- API Helper Function ---
+const apiRequest = async (url, method, token, body = null) => {
+  const options = {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  };
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(
+      errorData.message || `Request failed with status ${response.status}`
+    );
+  }
+  return response.json();
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 };
 
 const AdminDashboard = () => {
   const [employees, setEmployees] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+<<<<<<< HEAD
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("Active");
   const [previewFile, setPreviewFile] = useState(null);
+=======
+  const [error, setError] = useState(null);
+  const [filter, setFilter] = useState("Active");
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
     assignedTo: "",
     priority: "Medium",
     dueDate: "",
+<<<<<<< HEAD
     taskImage: null, // File object
   });
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -104,6 +145,13 @@ const AdminDashboard = () => {
   }, [searchTerm]);
 
   // Get user data and token from localStorage
+=======
+  });
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const navigate = useNavigate();
+
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
   const loggedInAdmin = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
 
@@ -120,8 +168,13 @@ const AdminDashboard = () => {
 
         // Fetch employees and tasks concurrently with the correct URLs
         const [employeesData, tasksData] = await Promise.all([
+<<<<<<< HEAD
           apiRequest("/api/admin/employees", "GET", token),
           apiRequest("/api/admin/tasks", "GET", token),
+=======
+          apiRequest(`${apiUrl}/api/admin/employees`, "GET", token),
+          apiRequest(`${apiUrl}/api/admin/tasks`, "GET", token),
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
         ]);
 
         setEmployees(employeesData);
@@ -137,6 +190,7 @@ const AdminDashboard = () => {
     };
 
     fetchAdminData();
+<<<<<<< HEAD
   }, [navigate, token]); // Rerun if navigate or token changes
 
   const handlePreview = (filePath) => {
@@ -202,12 +256,40 @@ const AdminDashboard = () => {
         showToast("Task assigned successfully!");
       }
 
+=======
+  }, [navigate, token]);
+
+  const handleInputChange = (e) =>
+    setNewTask((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleAssignTask = async (e) => {
+    e.preventDefault();
+    if (!newTask.title || !newTask.assignedTo)
+      return alert("Please provide a title and assign the task.");
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const createdTaskData = await apiRequest(
+        `${apiUrl}/api/admin/tasks`,
+        "POST",
+        token,
+        newTask
+      );
+      const newTaskWithEmployee = {
+        ...createdTaskData,
+        assignedTo: employees.find(
+          (emp) => emp._id === createdTaskData.assignedTo
+        ),
+      };
+      setTasks((prevTasks) => [newTaskWithEmployee, ...prevTasks]);
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
       setNewTask({
         title: "",
         description: "",
         assignedTo: "",
         priority: "Medium",
         dueDate: "",
+<<<<<<< HEAD
         taskImage: null,
       });
     } catch (err) {
@@ -241,12 +323,22 @@ const AdminDashboard = () => {
       setEditingTask(prev => ({ ...prev, taskImage: e.target.files[0] }));
     } else {
       setNewTask(prev => ({ ...prev, taskImage: e.target.files[0] }));
+=======
+      });
+    } catch (err) {
+      setError(err.message);
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
     }
   };
 
   const handleLogout = async () => {
     try {
+<<<<<<< HEAD
       await apiRequest("/api/auth/logout", "POST", token);
+=======
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      await apiRequest(`${apiUrl}/api/auth/logout`, "POST", token);
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
     } catch (err) {
       console.error("Logout failed:", err);
     } finally {
@@ -257,6 +349,7 @@ const AdminDashboard = () => {
   };
 
   const getFilteredTasks = () => {
+<<<<<<< HEAD
     let filtered = tasks;
     if (filter === "Active") filtered = tasks.filter((t) => t.status !== "Done");
     else if (filter === "Completed") filtered = tasks.filter((t) => t.status === "Done");
@@ -284,10 +377,18 @@ const AdminDashboard = () => {
   };
 
   // Prevent rendering anything if the user is not authenticated yet
+=======
+    if (filter === "Active") return tasks.filter((t) => t.status !== "Done");
+    if (filter === "Completed") return tasks.filter((t) => t.status === "Done");
+    return tasks;
+  };
+
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
   if (!loggedInAdmin) return null;
 
   return (
     <div
+<<<<<<< HEAD
       className="min-h-screen text-white/90 bg-[#08090a] overflow-x-hidden"
       style={{
         backgroundImage: `radial-gradient(at 0% 0%, hsla(215, 98%, 61%, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, hsla(125, 98%, 72%, 0.15) 0px, transparent 50%)`,
@@ -349,6 +450,38 @@ const AdminDashboard = () => {
                 />
               </motion.button>
             </Tooltip>
+=======
+      className="min-h-screen font-sans text-white/90 bg-slate-900"
+      style={{
+        backgroundImage: `radial-gradient(at 27% 37%, hsla(215, 98%, 61%, 0.1) 0px, transparent 50%), radial-gradient(at 97% 21%, hsla(125, 98%, 72%, 0.1) 0px, transparent 50%)`,
+      }}
+    >
+      <header className="sticky top-0 z-40 bg-slate-900/50 backdrop-blur-md border-b border-slate-700/60">
+        <div className="max-w-screen-2xl mx-auto p-4 flex justify-between items-center">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+            Admin Dashboard
+          </h1>
+          <div className="relative">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsProfileOpen((prev) => !prev)}
+              className="flex items-center gap-2 p-1 rounded-full bg-slate-800 border border-slate-700"
+            >
+              <img
+                src={loggedInAdmin.avatar}
+                alt="Admin"
+                className="w-8 h-8 rounded-full"
+              />
+              <span className="hidden sm:block text-sm font-semibold pr-2">
+                {loggedInAdmin.name}
+              </span>
+              <FiChevronDown
+                className={clsx("transition-transform mr-1", {
+                  "rotate-180": isProfileOpen,
+                })}
+              />
+            </motion.button>
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
             <AnimatePresence>
               {isProfileOpen && (
                 <ProfileDropdown
@@ -384,6 +517,7 @@ const AdminDashboard = () => {
                 <p className="text-center text-white/50">
                   Loading employees...
                 </p>
+<<<<<<< HEAD
               ) : getFilteredEmployees().length > 0 ? (
                 getFilteredEmployees().map((emp) => (
                   <EmployeeCard
@@ -396,6 +530,12 @@ const AdminDashboard = () => {
                 ))
               ) : (
                 <div className="text-center py-10 opacity-30 font-black uppercase tracking-widest text-xs">No team matches found</div>
+=======
+              ) : (
+                employees.map((emp) => (
+                  <EmployeeCard key={emp._id} employee={emp} tasks={tasks} />
+                ))
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
               )}
             </div>
           </motion.div>
@@ -405,9 +545,15 @@ const AdminDashboard = () => {
               visible: { y: 0, opacity: 1 },
             }}
           >
+<<<<<<< HEAD
             <SectionHeader icon={<FiClipboard />} title={editingTask ? "Update Task" : "Assign New Task"} />
             <TaskAssignmentForm
               {...{ newTask: editingTask || newTask, handleInputChange, handleAssignTask, handleTaskFileChange, employees, isEditing: !!editingTask, cancelEdit: () => setEditingTask(null) }}
+=======
+            <SectionHeader icon={<FiClipboard />} title="Assign New Task" />
+            <TaskAssignmentForm
+              {...{ newTask, handleInputChange, handleAssignTask, employees }}
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
             />
           </motion.div>
           <motion.div
@@ -418,6 +564,7 @@ const AdminDashboard = () => {
             className="lg:col-span-2 xl:col-span-1"
           >
             <SectionHeader icon={<FiActivity />} title="Global Task Feed" />
+<<<<<<< HEAD
             <div className="flex items-center gap-1 p-1 bg-white/5 backdrop-blur-md border border-white/5 rounded-2xl mb-6">
               {["Active", "Completed", "All"].map((tab) => (
                 <Tooltip key={tab} text={`Show ${tab} Tasks`}>
@@ -436,6 +583,25 @@ const AdminDashboard = () => {
                     {tab}
                   </motion.button>
                 </Tooltip>
+=======
+            <div className="flex items-center gap-2 p-1 bg-slate-800/60 backdrop-blur-sm rounded-xl mb-6">
+              {["Active", "Completed", "All"].map((tab) => (
+                <motion.button
+                  key={tab}
+                  onClick={() => setFilter(tab)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={clsx(
+                    "w-full py-2.5 text-sm font-semibold rounded-lg transition-colors",
+                    {
+                      "bg-indigo-600 text-white shadow-md": filter === tab,
+                      "text-white/60 hover:text-white/100": filter !== tab,
+                    }
+                  )}
+                >
+                  {tab}
+                </motion.button>
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
               ))}
             </div>
             <motion.div
@@ -453,7 +619,11 @@ const AdminDashboard = () => {
                   </div>
                 ) : (
                   getFilteredTasks().map((task) => (
+<<<<<<< HEAD
                     <AdminTaskCard key={task._id} task={task} onPreview={handlePreview} onEdit={() => setEditingTask(task)} />
+=======
+                    <AdminTaskCard key={task._id} task={task} />
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
                   ))
                 )}
               </AnimatePresence>
@@ -461,6 +631,7 @@ const AdminDashboard = () => {
           </motion.div>
         </motion.div>
       </main>
+<<<<<<< HEAD
 
       <AnimatePresence>
         {previewFile && (
@@ -474,6 +645,8 @@ const AdminDashboard = () => {
                  onClose={() => setToast(null)} />
         )}
       </AnimatePresence>
+=======
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
     </div>
   );
 };
@@ -482,13 +655,25 @@ const AdminDashboard = () => {
 
 const ProfileDropdown = ({ admin, onLogout, close }) => {
   const dropdownRef = useRef(null);
+<<<<<<< HEAD
   // ... (click outside effect remains)
+=======
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target))
+        close();
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [close]);
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
   return (
     <motion.div
       ref={dropdownRef}
       initial={{ opacity: 0, scale: 0.95, y: -10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -10 }}
+<<<<<<< HEAD
       className="absolute top-full right-0 mt-2 w-64 bg-slate-800/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden ring-1 ring-white/5"
     >
       <div className="p-4 border-b border-white/5">
@@ -500,6 +685,18 @@ const ProfileDropdown = ({ admin, onLogout, close }) => {
           whileHover={{ backgroundColor: "rgba(255,255,255,0.05)" }}
           onClick={onLogout}
           className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-red-400 hover:text-red-300 font-medium"
+=======
+      className="absolute top-full right-0 mt-2 w-64 bg-slate-800/90 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden"
+    >
+      <div className="p-4 border-b border-slate-700">
+        <p className="font-bold text-white">{admin.name}</p>
+      </div>
+      <div className="p-2">
+        <motion.button
+          whileHover={{ backgroundColor: "rgba(71,85,105,0.5)" }}
+          onClick={onLogout}
+          className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-md transition-colors"
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
         >
           <FiLogOut /> Logout
         </motion.button>
@@ -508,6 +705,7 @@ const ProfileDropdown = ({ admin, onLogout, close }) => {
   );
 };
 
+<<<<<<< HEAD
 const SectionHeader = memo(({ icon, title }) => (
   <div className="flex items-center gap-4 mb-8">
     <div className="bg-indigo-600/10 p-3.5 rounded-2xl text-indigo-400 border border-indigo-500/20 shadow-inner">
@@ -526,10 +724,28 @@ const EmployeeCard = memo(({ employee, tasks, onRemove, Tooltip }) => {
     <motion.div
       whileHover={{ y: -5, scale: 1.02 }}
       className="flex items-center gap-5 p-5 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg transition-all hover:bg-white/[0.07]"
+=======
+const SectionHeader = ({ icon, title }) => (
+  <div className="flex items-center gap-3 mb-6">
+    <div className="bg-slate-800 p-3 rounded-lg">{icon}</div>
+    <h2 className="text-2xl font-bold">{title}</h2>
+  </div>
+);
+
+const EmployeeCard = ({ employee, tasks }) => {
+  const taskCount = tasks.filter(
+    (t) => t.assignedTo._id === employee._id && t.status !== "Done"
+  ).length;
+  return (
+    <motion.div
+      whileHover={{ y: -5 }}
+      className="flex items-center gap-5 p-5 rounded-2xl bg-slate-800/50 backdrop-blur-md border border-slate-700/60"
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
     >
       <img
         src={employee.avatar}
         alt={employee.name}
+<<<<<<< HEAD
         loading="lazy"
         className="w-14 h-14 rounded-2xl border-2 border-indigo-500/30 object-cover shadow-xl shadow-indigo-500/10"
       />
@@ -563,21 +779,57 @@ const EmployeeCard = memo(({ employee, tasks, onRemove, Tooltip }) => {
   );
 });
 EmployeeCard.displayName = "EmployeeCard";
+=======
+        className="w-14 h-14 rounded-full border-2 border-slate-600"
+      />
+      <div className="flex-grow">
+        <p className="font-bold text-lg text-white">{employee.name}</p>
+        <p className="text-sm text-white/60">{employee.role}</p>
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <div
+          className={clsx(
+            "flex items-center gap-2 text-xs font-semibold px-2.5 py-1 rounded-full",
+            {
+              "bg-green-500/20 text-green-400": employee.status === "Online",
+              "bg-slate-600/50 text-slate-400": employee.status === "Offline",
+            }
+          )}
+        >
+          <div
+            className={clsx("w-2 h-2 rounded-full", {
+              "bg-green-400": employee.status === "Online",
+              "bg-slate-500": employee.status === "Offline",
+            })}
+          />
+          {employee.status}
+        </div>
+        <p className="text-xs text-white/50">{taskCount} active</p>
+      </div>
+    </motion.div>
+  );
+};
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 
 const TaskAssignmentForm = ({
   newTask,
   handleInputChange,
   handleAssignTask,
+<<<<<<< HEAD
   handleTaskFileChange,
   employees,
   isEditing,
   cancelEdit
+=======
+  employees,
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 }) => {
   const commonInputClass =
     "w-full bg-slate-900/80 border border-slate-600 rounded-lg p-4 text-base text-white/90 focus:ring-2 focus:ring-indigo-500 focus:outline-none";
   return (
     <form
       onSubmit={handleAssignTask}
+<<<<<<< HEAD
       className="p-6 sm:p-8 rounded-[2rem] bg-white/5 backdrop-blur-xl border border-white/10 space-y-6 shadow-2xl relative overflow-hidden"
     >
       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 blur-3xl -z-10" />
@@ -681,10 +933,74 @@ const TaskAssignmentForm = ({
           {isEditing ? "Update Task" : "Create Task"}
         </motion.button>
       </div>
+=======
+      className="p-8 rounded-2xl bg-slate-800/50 backdrop-blur-md border border-slate-700/60 space-y-5"
+    >
+      <input
+        type="text"
+        name="title"
+        value={newTask.title}
+        onChange={handleInputChange}
+        placeholder="Task Title"
+        required
+        className={commonInputClass}
+      />
+      <textarea
+        name="description"
+        value={newTask.description}
+        onChange={handleInputChange}
+        placeholder="Task Description"
+        className={`${commonInputClass} min-h-[120px]`}
+      />
+      <div className="grid grid-cols-2 gap-4">
+        <select
+          name="assignedTo"
+          value={newTask.assignedTo}
+          onChange={handleInputChange}
+          required
+          className={commonInputClass}
+        >
+          <option value="" disabled>
+            Assign to...
+          </option>
+          {employees.map((emp) => (
+            <option key={emp._id} value={emp._id}>
+              {emp.name}
+            </option>
+          ))}
+        </select>
+        <select
+          name="priority"
+          value={newTask.priority}
+          onChange={handleInputChange}
+          className={commonInputClass}
+        >
+          <option>Low</option>
+          <option>Medium</option>
+          <option>High</option>
+        </select>
+      </div>
+      <input
+        type="date"
+        name="dueDate"
+        value={newTask.dueDate}
+        onChange={handleInputChange}
+        className={commonInputClass}
+      />
+      <motion.button
+        type="submit"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        className="w-full text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 py-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+      >
+        <FiPlus /> Assign Task
+      </motion.button>
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
     </form>
   );
 };
 
+<<<<<<< HEAD
 const FileDisplay = ({ filePath, label, isResult = false, onPreview }) => {
   if (!filePath) return null;
   const isImage = /\.(jpeg|jpg|png|webp)$/i.test(filePath);
@@ -817,11 +1133,19 @@ const AdminTaskCard = memo(({ task, onPreview, onEdit }) => {
     High: "text-red-400 bg-red-400/10 border-red-400/20",
     Medium: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
     Low: "text-sky-400 bg-sky-400/10 border-sky-400/20",
+=======
+const AdminTaskCard = ({ task }) => {
+  const priorityConfig = {
+    High: "text-red-400",
+    Medium: "text-yellow-400",
+    Low: "text-sky-400",
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
   };
   const assignedEmployee = task.assignedTo;
   return (
     <motion.div
       layout
+<<<<<<< HEAD
       whileHover={{ y: -5, scale: 1.01 }}
       className="p-6 rounded-[2rem] bg-white/5 backdrop-blur-xl border border-white/10 shadow-xl transition-all relative overflow-hidden group"
     >
@@ -877,10 +1201,42 @@ const AdminTaskCard = memo(({ task, onPreview, onEdit }) => {
                 {assignedEmployee.name}
               </span>
             </div>
+=======
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      whileHover={{ y: -5 }}
+      className="p-5 rounded-2xl bg-slate-800/50 backdrop-blur-md border border-slate-700/60"
+    >
+      <div className="flex justify-between items-start mb-3">
+        <p className="font-bold text-white pr-4">{task.title}</p>
+        <span
+          className={clsx(
+            "flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold",
+            priorityConfig[task.priority]
+          )}
+        >
+          <FiFlag size={14} /> {task.priority}
+        </span>
+      </div>
+      <p className="text-sm text-white/60 mb-4">{task.description}</p>
+      <div className="border-t border-slate-700/60 pt-3 flex items-center justify-between">
+        {assignedEmployee ? (
+          <div className="flex items-center gap-2">
+            <img
+              src={assignedEmployee.avatar}
+              alt={assignedEmployee.name}
+              className="w-6 h-6 rounded-full"
+            />
+            <span className="text-sm text-white/70">
+              {assignedEmployee.name}
+            </span>
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
           </div>
         ) : (
           <div />
         )}
+<<<<<<< HEAD
         <div className="flex items-center gap-3">
            <span className={clsx("text-[9px] font-black uppercase tracking-[0.3em] px-3 py-1.5 rounded-xl border", {
              "text-emerald-400 bg-emerald-500/10 border-emerald-500/10": task.status === "Done",
@@ -908,3 +1264,14 @@ const AdminTaskCard = memo(({ task, onPreview, onEdit }) => {
 });
 
 export default AdminDashboard;
+=======
+        <span className="text-xs text-white/50">
+          {task.status === "Done" ? "Completed" : task.status}
+        </span>
+      </div>
+    </motion.div>
+  );
+};
+
+export default AdminDashboard;
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5

@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import React from "react";
+=======
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
@@ -10,7 +13,10 @@ import {
   FiUser,
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
+<<<<<<< HEAD
 import { apiRequest } from "./api";
+=======
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 
 const SignUp = () => {
   const [username, setUsername] = useState("");
@@ -33,7 +39,20 @@ const SignUp = () => {
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
     try {
+<<<<<<< HEAD
       await apiRequest("/api/auth/signup", "POST", null, { username, name, email, password });
+=======
+      // Use the apiUrl variable in the fetch request
+      const response = await fetch(`${apiUrl}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, name, email, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Something went wrong.");
+      }
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
       setIsSuccess(true);
       setTimeout(() => navigate("/login"), 2000);
     } catch (err) {
@@ -44,6 +63,7 @@ const SignUp = () => {
   };
 
   return (
+<<<<<<< HEAD
     <div className="min-h-screen font-['Poppins'] text-white/90 bg-[#08090a] flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 blur-[120px] rounded-full" />
@@ -83,6 +103,42 @@ const SignUp = () => {
           </motion.div>
         </div>
         <div className="w-full lg:w-3/5 p-8 lg:p-16 bg-white/[0.01]">
+=======
+    <div className="min-h-screen font-sans text-white/90 bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-900" />
+      <div className="absolute inset-0 z-10 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.04%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative z-20 flex flex-col lg:flex-row w-full max-w-6xl bg-slate-800/50 backdrop-blur-md border border-slate-700/60 rounded-2xl shadow-2xl overflow-hidden"
+      >
+        <div className="hidden lg:flex w-full lg:w-2/5 p-8 flex-col justify-center items-center lg:items-start text-center lg:text-left">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <div className="inline-block p-4 mb-6 bg-indigo-500/20 rounded-full">
+              <FiUser className="text-indigo-400 text-6xl" />
+            </div>
+            <h1 className="text-5xl font-extrabold tracking-tight text-white">
+              Join the Mission
+            </h1>
+            <p className="text-lg text-white/60 mt-3 mb-8">
+              Create your account to start managing tasks like never before.
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate("/login")}
+              className="w-full lg:w-auto text-lg font-semibold text-white bg-transparent border-2 border-white/50 hover:bg-white/10 py-3 px-6 rounded-lg flex items-center justify-center gap-2"
+            >
+              Already have an account?
+            </motion.button>
+          </motion.div>
+        </div>
+        <div className="w-full lg:w-3/5 p-8 lg:p-12 bg-slate-900/50">
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
           <motion.div
             variants={{ error: { x: [0, -5, 5, -5, 5, 0] } }}
             animate={error ? "error" : ""}
@@ -97,11 +153,19 @@ const SignUp = () => {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
+<<<<<<< HEAD
                   <h2 className="text-3xl font-black text-white mb-10 uppercase tracking-tight">
                     Create Profile
                   </h2>
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+=======
+                  <h2 className="text-4xl font-bold text-white mb-8">
+                    Create Account
+                  </h2>
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="flex flex-col sm:flex-row gap-6">
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
                       <FloatingLabelInput
                         id="name"
                         label="Full Name"
@@ -138,6 +202,7 @@ const SignUp = () => {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
+<<<<<<< HEAD
                         className="absolute top-1/2 right-4 -translate-y-1/2 text-white/20 hover:text-white/60 z-20 transition-colors"
                       >
                          {showPassword ? <FiUser /> : <FiLock className="rotate-12" />}
@@ -155,6 +220,25 @@ const SignUp = () => {
                           <div className="w-5 h-5 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
                         ) : (
                           "Establish Account"
+=======
+                        className="absolute top-1/2 right-4 -translate-y-1/2 text-white/40 hover:text-white/80 z-20"
+                      >
+                        <FiEyeOff />
+                      </button>
+                    </FloatingLabelInput>
+                    <div>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700/50 py-4 rounded-lg flex items-center justify-center mt-4"
+                      >
+                        {isLoading ? (
+                          <div className="w-6 h-6 border-4 border-t-transparent border-white rounded-full animate-spin" />
+                        ) : (
+                          "Create Account"
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
                         )}
                       </motion.button>
                     </div>
@@ -197,7 +281,11 @@ const FloatingLabelInput = ({
     <input
       id={id}
       className={clsx(
+<<<<<<< HEAD
         "peer w-full bg-white/[0.03] border-2 border-white/10 rounded-2xl p-4 pt-7 text-sm text-white font-medium focus:outline-none focus:border-indigo-500/50 transition-all placeholder-transparent",
+=======
+        "peer w-full bg-transparent border-2 border-slate-600 rounded-lg p-4 pt-6 text-base text-white/90 focus:outline-none focus:border-indigo-500 placeholder-transparent",
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
         Icon && "pl-12"
       )}
       type={type}
@@ -209,12 +297,21 @@ const FloatingLabelInput = ({
     <label
       htmlFor={id}
       className={clsx(
+<<<<<<< HEAD
         "absolute text-white/20 transition-all duration-300 pointer-events-none font-bold uppercase tracking-widest",
         Icon ? "left-12" : "left-4",
         "peer-placeholder-shown:top-5 peer-placeholder-shown:text-xs",
         "peer-focus:top-2 peer-focus:text-[10px] peer-focus:text-indigo-400",
         value && "top-2 text-[10px] text-indigo-400/60",
         "autofill:top-2 autofill:text-[10px]"
+=======
+        "absolute top-4 text-white/40 transition-all duration-200 pointer-events-none",
+        Icon ? "left-12" : "left-4",
+        "peer-placeholder-shown:top-4 peer-placeholder-shown:text-base",
+        "peer-focus:top-1.5 peer-focus:text-xs peer-focus:text-indigo-400",
+        value && "top-1.5 text-xs",
+        "autofill:top-1.5 autofill:text-xs"
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
       )}
     >
       {label}
@@ -246,4 +343,8 @@ const SuccessView = ({ isLogin }) => (
   </motion.div>
 );
 
+<<<<<<< HEAD
 export default SignUp;
+=======
+export default SignUp;
+>>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
