@@ -13,7 +13,7 @@ require("dotenv").config();
 
 const app = express();
 const https = require("https"); // For keep-alive self-ping
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5005;
 
 // --- Security and CORS Middleware ---
 app.use(
@@ -24,7 +24,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "frame-ancestors": ["'self'", process.env.CLIENT_URL || "http://localhost:5173"],
+        "frame-ancestors": ["'self'", "http://localhost:3000", "http://localhost:5173", "https://emsfrontend-6y80.onrender.com"],
       },
     },
   })
@@ -32,7 +32,9 @@ app.use(
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: ["http://localhost:3000", "http://localhost:5173", "https://emsfrontend-6y80.onrender.com", ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
