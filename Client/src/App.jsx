@@ -1,8 +1,5 @@
 // src/App.jsx
-<<<<<<< HEAD
 import React from "react";
-=======
->>>>>>> 1a75f8264234661b0e644e07b30cb76170f1efb5
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 // Import your page components
