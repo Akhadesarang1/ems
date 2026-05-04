@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const path = require("path"); // For serving static files
-const fs = require("fs"); 
+const fs = require("fs");
 const multer = require("multer");
 const helmet = require("helmet"); // For security headers
 
